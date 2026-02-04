@@ -1,22 +1,19 @@
 {
   "root": true,
   "env": {
-    "es2021": true,
     "node": true,
-    "browser": false
+    "es2021": true
   },
-  "extends": ["eslint:recommended", "google"],
-"parserOptions": {
-  "ecmaVersion": 2021,
-  "sourceType": "script"
-},
+  "extends": [
+    "eslint:recommended",
+    "google"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2021,
+    "sourceType": "script"
+  },
   "rules": {
-    "max-len": ["error", { "code": 80 }],
     "require-jsdoc": "off",
-    "indent": ["error", 2],
-    "quotes": ["error", "double"],
-    "object-curly-spacing": ["error", "always"],
-    "comma-dangle": ["error", "always-multiline"],
-    "padded-blocks": ["error", "never"]
+    "max-len": "off"
   }
 }
