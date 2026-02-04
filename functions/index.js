@@ -14,6 +14,12 @@ const TWILIO_SMS = functions.config().twilio.phone;
 const TWILIO_WHATSAPP = "whatsapp:+14155238886";
 
 // -------------------- HELPERS --------------------
+
+/**
+ * Send an SMS via Twilio
+ * @param {string} phone - Recipient phone number
+ * @param {string} message - Message body
+ */
 async function sendSms(phone, message) {
   try {
     await client.messages.create({ body: message, from: TWILIO_SMS, to: phone });
@@ -22,14 +28,28 @@ async function sendSms(phone, message) {
   }
 }
 
+/**
+ * Send a WhatsApp message via Twilio
+ * @param {string} phone - Recipient phone number
+ * @param {string} message - Message body
+ */
 async function sendWhatsApp(phone, message) {
   try {
-    await client.messages.create({ body: message, from: TWILIO_WHATSAPP, to: "whatsapp:" + phone });
+    await client.messages.create({
+      body: message,
+      from: TWILIO_WHATSAPP,
+      to: "whatsapp:" + phone,
+    });
   } catch (err) {
     console.error("WhatsApp failed for", phone, err.message);
   }
 }
 
+/**
+ * Validate and format phone number
+ * @param {string} phone - Raw phone number
+ * @returns {string} - Formatted phone number with +
+ */
 function validatePhone(phone) {
   let p = phone.replace(/\D/g, "");
   if (p.startsWith("0")) p = "27" + p.slice(1);
@@ -37,6 +57,11 @@ function validatePhone(phone) {
   return "+" + p;
 }
 
+/**
+ * Validate email address
+ * @param {string} email
+ * @returns {string} - Valid email
+ */
 function validateEmail(email) {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!re.test(email)) throw new Error("Invalid email address");
@@ -44,12 +69,12 @@ function validateEmail(email) {
 }
 
 // -------------------- CREATE BOOKING --------------------
-exports.createBooking = functions.https.onCall(async (data, context) => {
-  const {
-    style, length, price,
-    clientName, clientPhone,
-    date, time, method, email
-  } = data;
+
+/**
+ * Cloud function to create a booking and initialize Paystack payment
+ */
+exports.createBooking = functions.https.onCall(async (data) => {
+  const { style, length, price, clientName, clientPhone, date, time, method, email } = data;
 
   if (!style || !length || !price || !clientName || !clientPhone || !date || !time || !email) {
     throw new functions.https.HttpsError("invalid-argument", "Missing fields");
@@ -67,7 +92,7 @@ exports.createBooking = functions.https.onCall(async (data, context) => {
     method,
     status: "Pending",
     paymentStatus: "Unpaid",
-    createdAt: admin.firestore.FieldValue.serverTimestamp()
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
   const response = await axios.post(
@@ -75,80 +100,94 @@ exports.createBooking = functions.https.onCall(async (data, context) => {
     {
       email,
       amount: Math.round(price * 100),
-      metadata: { bookingId: bookingRef.id }
+      metadata: { bookingId: bookingRef.id },
     },
     {
       headers: {
-        Authorization: `Bearer ${functions.config().paystack.secret}`
-      }
+        Authorization: `Bearer ${functions.config().paystack.secret}`,
+      },
     }
   );
 
   return {
-    authorization_url: response.data.data.authorization_url
+    authorization_url: response.data.data.authorization_url,
   };
 });
 
 // -------------------- PAYSTACK WEBHOOK --------------------
+
+/**
+ * Cloud function to handle Paystack webhook
+ */
 exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
   try {
     if (req.method !== "POST") return res.status(405).send("Method not allowed");
 
-    const paystackSignature = req.headers['x-paystack-signature'];
+    const paystackSignature = req.headers["x-paystack-signature"];
     const secret = functions.config().paystack.secret;
 
     // Verify webhook signature
-    const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(req.body)).digest('hex');
-    if (hash !== paystackSignature) return res.status(400).send('Invalid signature');
+    const hash = crypto
+      .createHmac("sha512", secret)
+      .update(JSON.stringify(req.body))
+      .digest("hex");
+    if (hash !== paystackSignature) return res.status(400).send("Invalid signature");
 
     const event = req.body;
 
-    if (event.event === 'charge.success') {
+    if (event.event === "charge.success") {
       const transaction = event.data;
       const bookingId = transaction.metadata && transaction.metadata.bookingId;
-
-      if (!bookingId) return res.status(400).send('Missing bookingId');
+      if (!bookingId) return res.status(400).send("Missing bookingId");
 
       const bookingRef = db.collection("bookings").doc(bookingId);
 
-      // Use transaction to prevent double updates
       await db.runTransaction(async (tx) => {
         const snap = await tx.get(bookingRef);
         const booking = snap.data();
         if (!booking) throw new Error("Booking not found");
-        if (booking.paymentStatus === "Paid") return; // Already processed
+        if (booking.paymentStatus === "Paid") return;
 
         tx.update(bookingRef, {
           paymentStatus: "Paid",
           verified: true,
           depositPaid: transaction.amount / 100,
           status: "Accepted",
-          receiptEmailSent: false
+          receiptEmailSent: false,
         });
 
-        const message = `✅ Booking confirmed!\nHi ${booking.clientName}, your ${booking.style} (${booking.length}) appointment is confirmed.\n📅 ${booking.date}\n🕒 ${booking.time}`;
-        if (booking.method === "whatsapp") await sendWhatsApp(booking.clientPhone, message);
-        else await sendSms(booking.clientPhone, message);
+        const message =
+          `✅ Booking confirmed!\nHi ${booking.clientName}, your ${booking.style} (${booking.length}) ` +
+          `appointment is confirmed.\n📅 ${booking.date}\n🕒 ${booking.time}`;
+        if (booking.method === "whatsapp") {
+          await sendWhatsApp(booking.clientPhone, message);
+        } else {
+          await sendSms(booking.clientPhone, message);
+        }
       });
 
       console.log(`Booking ${bookingId} verified and confirmed.`);
-      return res.status(200).send('Webhook processed');
+      return res.status(200).send("Webhook processed");
     }
 
-    return res.status(200).send('Event ignored');
-
+    return res.status(200).send("Event ignored");
   } catch (err) {
     console.error("Webhook error:", err.message);
-    return res.status(500).send('Internal Server Error');
+    return res.status(500).send("Internal Server Error");
   }
 });
 
 // -------------------- 5-HOUR REMINDERS --------------------
+
+/**
+ * Scheduled function to send reminders 5 hours before appointments
+ */
 exports.sendFiveHourReminders = functions.pubsub
   .schedule("every 5 minutes")
   .onRun(async () => {
     const now = admin.firestore.Timestamp.now();
-    const snapshot = await db.collection("bookings")
+    const snapshot = await db
+      .collection("bookings")
       .where("status", "==", "Accepted")
       .where("reminderSent", "==", false)
       .where("reminderAt", "<=", now)
@@ -158,11 +197,16 @@ exports.sendFiveHourReminders = functions.pubsub
 
     for (const doc of snapshot.docs) {
       const booking = doc.data();
-      const message = `⏰ Reminder\nHi ${booking.clientName}, your ${booking.style} (${booking.length}) appointment is in 5 hours.\n📅 ${booking.date}\n🕒 ${booking.time}`;
+      const message =
+        `⏰ Reminder\nHi ${booking.clientName}, your ${booking.style} (${booking.length}) ` +
+        `appointment is in 5 hours.\n📅 ${booking.date}\n🕒 ${booking.time}`;
 
       try {
-        if (booking.method === "whatsapp") await sendWhatsApp(booking.clientPhone, message);
-        else await sendSms(booking.clientPhone, message);
+        if (booking.method === "whatsapp") {
+          await sendWhatsApp(booking.clientPhone, message);
+        } else {
+          await sendSms(booking.clientPhone, message);
+        }
 
         await db.collection("reminderLogs").add({
           bookingId: doc.id,
@@ -174,7 +218,6 @@ exports.sendFiveHourReminders = functions.pubsub
         });
 
         await doc.ref.update({ reminderSent: true });
-
       } catch (err) {
         console.error("Reminder failed for", booking.clientPhone, err.message);
       }
