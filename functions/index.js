@@ -105,7 +105,7 @@ exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
 
     if (event.event === 'charge.success') {
       const transaction = event.data;
-      const bookingId = transaction.metadata?.bookingId;
+      const bookingId = transaction.metadata && transaction.metadata.bookingId;
 
       if (!bookingId) return res.status(400).send('Missing bookingId');
 
