@@ -4,19 +4,19 @@ const admin = require("firebase-admin");
 const twilio = require("twilio");
 const axios = require("axios");
 const crypto = require("crypto");
-const { getParams } = require("firebase-functions/params");
+const { defineString } = require("firebase-functions/params");
 
 admin.initializeApp();
 const db = admin.firestore();
 
 // -------------------- ENV PARAMS --------------------
-const TWILIO_SID = getParams().twilio.sid.value;
-const TWILIO_TOKEN = getParams().twilio.token.value;
-const TWILIO_SMS = getParams().twilio.phone.value;
-const PAYSTACK_SECRET = getParams().paystack.secret.value;
+const TWILIO_SID = defineString("TWILIO_SID");
+const TWILIO_TOKEN = defineString("TWILIO_TOKEN");
+const TWILIO_SMS = defineString("TWILIO_SMS");
+const PAYSTACK_SECRET = defineString("PAYSTACK_SECRET");
 const TWILIO_WHATSAPP = "whatsapp:+14155238886";
 
-const client = twilio(TWILIO_SID, TWILIO_TOKEN);
+const client = twilio(TWILIO_SID.value(), TWILIO_TOKEN.value());
 
 // -------------------- HELPERS --------------------
 async function sendSms(phone, message) {
@@ -74,7 +74,7 @@ exports.createBooking = functions.https.onCall(async (data, context) => {
   const response = await axios.post(
     "https://api.paystack.co/transaction/initialize",
     { email, amount: Math.round(price * 100), metadata: { bookingId: bookingRef.id } },
-    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
+{ headers: { Authorization: `Bearer ${PAYSTACK_SECRET.value()}` } }
   );
 
   return { authorization_url: response.data.data.authorization_url };
@@ -86,7 +86,10 @@ exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
     if (req.method !== "POST") return res.status(405).send("Method not allowed");
 
     const paystackSignature = req.headers["x-paystack-signature"];
-    const hash = crypto.createHmac("sha512", PAYSTACK_SECRET).update(JSON.stringify(req.body)).digest("hex");
+const hash = crypto
+  .createHmac("sha512", PAYSTACK_SECRET.value())
+  .update(JSON.stringify(req.body))
+  .digest("hex");
 
     if (hash !== paystackSignature) return res.status(400).send("Invalid signature");
 
