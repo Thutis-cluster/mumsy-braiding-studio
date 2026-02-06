@@ -1295,6 +1295,10 @@ function validateClientForm() {
   });
 }
 
+import { getFunctions, httpsCallable } from "firebase/functions";
+
+let paymentInProgress = false;
+
 async function payDeposit() {
   if (paymentInProgress) return;
   paymentInProgress = true;
@@ -1302,9 +1306,10 @@ async function payDeposit() {
   document.querySelectorAll(".submit-btn").forEach(b => b.disabled = true);
 
   try {
-    const fn = firebase.functions().httpsCallable("createBooking");
+    const functions = getFunctions();
+    const createBooking = httpsCallable(functions, "createBooking");
 
-    const res = await fn({
+    const res = await createBooking({
       style: selectedStyle,
       length: selectedLength,
       price: selectedPrice,
@@ -1313,15 +1318,13 @@ async function payDeposit() {
       date: document.getElementById("clientDate").value,
       time: document.getElementById("clientTime").value,
       method: bookingMethod,
-      email: document.getElementById("clientEmail").value || "customer@mumsybraids.com"
+      email: document.getElementById("clientEmail").value,
     });
 
-    // ✅ REDIRECT TO PAYSTACK (NOT POPUP)
     window.location.href = res.data.authorization_url;
-
   } catch (err) {
-    console.error("Payment init failed:", err);
-    alert("❌ Could not start payment");
+    console.error(err);
+    alert("❌ Payment could not start");
     paymentInProgress = false;
     document.querySelectorAll(".submit-btn").forEach(b => b.disabled = false);
   }
