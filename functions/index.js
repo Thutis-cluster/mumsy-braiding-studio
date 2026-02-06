@@ -1,6 +1,5 @@
 // functions/index.js
-import { onCall } from "firebase-functions/v2/https";
-import { onRequest } from "firebase-functions/v2/https";
+import { onCall, onRequest } from "firebase-functions/v2/https";
 import { defineString } from "firebase-functions/params";
 import admin from "firebase-admin";
 import axios from "axios";
@@ -17,7 +16,17 @@ const TWILIO_TOKEN = defineString("TWILIO_TOKEN");
 const TWILIO_SMS = defineString("TWILIO_SMS");
 const TWILIO_WHATSAPP = "whatsapp:+14155238886";
 
-const twilioClient = twilio(TWILIO_SID.value(), TWILIO_TOKEN.value());
+let twilioClient;
+
+function getTwilioClient() {
+  if (!twilioClient) {
+    twilioClient = twilio(
+      TWILIO_SID.value(),
+      TWILIO_TOKEN.value()
+    );
+  }
+  return twilioClient;
+}
 
 /* ================= HELPERS ================= */
 function validateEmail(email) {
@@ -34,14 +43,17 @@ function validatePhone(phone) {
 }
 
 async function sendMessage(phone, message, method = "sms") {
+  const client = getTwilioClient();
+
   if (method === "whatsapp") {
-    return twilioClient.messages.create({
+    return client.messages.create({
       body: message,
       from: TWILIO_WHATSAPP,
       to: `whatsapp:${phone}`,
     });
   }
-  return twilioClient.messages.create({
+
+  return client.messages.create({
     body: message,
     from: TWILIO_SMS.value(),
     to: phone,
