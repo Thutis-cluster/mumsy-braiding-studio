@@ -1,64 +1,69 @@
-// index.js
-import * as functions from "firebase-functions/v2";
-import * as admin from "firebase-admin";
-import twilio from "twilio";
+// functions/index.js
+import { onCall } from "firebase-functions/v2/https";
+import { onRequest } from "firebase-functions/v2/https";
+import { defineString } from "firebase-functions/params";
+import admin from "firebase-admin";
 import axios from "axios";
 import crypto from "crypto";
-import { defineString } from "firebase-functions/params"; // <-- use import
+import twilio from "twilio";
 
 admin.initializeApp();
 const db = admin.firestore();
 
-// -------------------- ENV PARAMS --------------------
+/* ================= ENV VARS ================= */
+const PAYSTACK_SECRET = defineString("PAYSTACK_SECRET");
 const TWILIO_SID = defineString("TWILIO_SID");
 const TWILIO_TOKEN = defineString("TWILIO_TOKEN");
 const TWILIO_SMS = defineString("TWILIO_SMS");
-const PAYSTACK_SECRET = defineString("PAYSTACK_SECRET");
 const TWILIO_WHATSAPP = "whatsapp:+14155238886";
 
-const client = twilio(TWILIO_SID.value(), TWILIO_TOKEN.value());
+const twilioClient = twilio(TWILIO_SID.value(), TWILIO_TOKEN.value());
 
-// -------------------- HELPERS --------------------
-async function sendMessage(phone, message, method = "sms", retries = 3) {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      if (method === "whatsapp") {
-        await client.messages.create({
-          body: message,
-          from: TWILIO_WHATSAPP,
-          to: `whatsapp:${phone}`,
-        });
-      } else {
-        await client.messages.create({ body: message, from: TWILIO_SMS.value(), to: phone });
-      }
-      return true;
-    } catch (err) {
-      console.error(`Attempt ${attempt} failed for ${phone}:`, err.message);
-      if (attempt === retries) throw err;
-      await new Promise((res) => setTimeout(res, 1000 * attempt)); // exponential backoff
-    }
-  }
-}
-
-function validatePhone(phone) {
-  let p = String(phone).replace(/\D/g, "");
-  if (p.startsWith("0")) p = "27" + p.slice(1);
-  if (!/^\d{11,15}$/.test(p)) throw new Error("Invalid phone number");
-  return "+" + p;
-}
-
+/* ================= HELPERS ================= */
 function validateEmail(email) {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!re.test(email)) throw new Error("Invalid email address");
+  if (!re.test(email)) throw new Error("Invalid email");
   return email;
 }
 
-// -------------------- CREATE BOOKING --------------------
-export const createBooking = functions.https.onCall(async (data) => {
-  const { style, length, price, clientName, clientPhone, date, time, method, email } = data;
+function validatePhone(phone) {
+  let p = phone.replace(/\D/g, "");
+  if (p.startsWith("0")) p = "27" + p.slice(1);
+  if (!/^\d{11,15}$/.test(p)) throw new Error("Invalid phone");
+  return "+" + p;
+}
+
+async function sendMessage(phone, message, method = "sms") {
+  if (method === "whatsapp") {
+    return twilioClient.messages.create({
+      body: message,
+      from: TWILIO_WHATSAPP,
+      to: `whatsapp:${phone}`,
+    });
+  }
+  return twilioClient.messages.create({
+    body: message,
+    from: TWILIO_SMS.value(),
+    to: phone,
+  });
+}
+
+/* ================= CREATE BOOKING ================= */
+export const createBooking = onCall(async (request) => {
+  const {
+    style,
+    length,
+    price,
+    clientName,
+    clientPhone,
+    date,
+    time,
+    method,
+    email,
+  } = request.data;
 
   if (!style || !length || !price || !clientName || !clientPhone || !date || !time || !email) {
-    throw new functions.https.HttpsError("invalid-argument", "Missing fields");
+    throw new Error("Missing fields");
   }
 
   const bookingRef = await db.collection("bookings").add({
@@ -76,58 +81,79 @@ export const createBooking = functions.https.onCall(async (data) => {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
+  // Example: 30% deposit
+  const depositAmount = Math.round(price * 0.3 * 100);
+
   const response = await axios.post(
     "https://api.paystack.co/transaction/initialize",
-    { email, amount: Math.round(price * 100), metadata: { bookingId: bookingRef.id } },
-    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET.value()}` } }
+    {
+      email,
+      amount: depositAmount,
+      metadata: { bookingId: bookingRef.id },
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${PAYSTACK_SECRET.value()}`,
+        "Content-Type": "application/json",
+      },
+    }
   );
 
   return { authorization_url: response.data.data.authorization_url };
 });
 
-// -------------------- PAYSTACK WEBHOOK --------------------
-export const paystackWebhook = functions.https.onRequest(async (req, res) => {
+/* ================= PAYSTACK WEBHOOK ================= */
+export const paystackWebhook = onRequest(async (req, res) => {
   try {
-    if (req.method !== "POST") return res.status(405).send("Method not allowed");
-
     const signature = req.headers["x-paystack-signature"];
-    const hash = crypto.createHmac("sha512", PAYSTACK_SECRET.value()).update(JSON.stringify(req.body)).digest("hex");
-    if (hash !== signature) return res.status(400).send("Invalid signature");
+    const hash = crypto
+      .createHmac("sha512", PAYSTACK_SECRET.value())
+      .update(JSON.stringify(req.body))
+      .digest("hex");
 
-    const event = req.body;
-    if (event.event === "charge.success") {
-      const { metadata, amount, customer } = event.data;
-      const bookingId = metadata?.bookingId;
-      if (!bookingId) return res.status(400).send("Missing bookingId");
-
-      const bookingRef = db.collection("bookings").doc(bookingId);
-
-      await db.runTransaction(async (tx) => {
-        const snap = await tx.get(bookingRef);
-        const booking = snap.data();
-        if (!booking) throw new Error("Booking not found");
-        if (booking.paymentStatus === "Paid") return;
-
-        tx.update(bookingRef, {
-          paymentStatus: "Paid",
-          verified: true,
-          depositPaid: amount / 100,
-          status: "Accepted",
-          receiptEmailSent: false,
-        });
-
-        const message = `✅ Booking confirmed!\nHi ${booking.clientName}, your ${booking.style} (${booking.length}) appointment is confirmed.\n📅 ${booking.date}\n🕒 ${booking.time}`;
-        await sendMessage(booking.clientPhone, message, booking.method);
-      });
-
-      console.log(`Booking ${bookingId} verified and confirmed.`);
-      return res.status(200).send("Webhook processed");
+    if (hash !== signature) {
+      return res.status(400).send("Invalid signature");
     }
 
-    return res.status(200).send("Event ignored");
+    const event = req.body;
+
+    if (event.event !== "charge.success") {
+      return res.status(200).send("Ignored");
+    }
+
+    const { metadata, amount } = event.data;
+    const bookingId = metadata?.bookingId;
+    if (!bookingId) return res.status(400).send("No bookingId");
+
+    const bookingRef = db.collection("bookings").doc(bookingId);
+
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(bookingRef);
+      if (!snap.exists) throw new Error("Booking not found");
+
+      const booking = snap.data();
+      if (booking.paymentStatus === "Paid") return;
+
+      tx.update(bookingRef, {
+        paymentStatus: "Paid",
+        depositPaid: amount / 100,
+        status: "Accepted",
+        receiptEmailSent: false,
+      });
+
+      const msg = `✅ Booking confirmed!
+Hi ${booking.clientName}
+📅 ${booking.date}
+🕒 ${booking.time}
+Style: ${booking.style}`;
+
+      await sendMessage(booking.clientPhone, msg, booking.method);
+    });
+
+    return res.status(200).send("Success");
   } catch (err) {
-    console.error("Webhook error:", err.message);
-    return res.status(500).send("Internal Server Error");
+    console.error(err);
+    return res.status(500).send("Server error");
   }
 });
 
