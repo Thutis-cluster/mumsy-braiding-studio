@@ -4,35 +4,38 @@ import * as admin from "firebase-admin";
 import twilio from "twilio";
 import axios from "axios";
 import crypto from "crypto";
+import { defineString } from "firebase-functions/params"; // <-- use import
 
 admin.initializeApp();
 const db = admin.firestore();
 
 // -------------------- ENV PARAMS --------------------
-const { defineString } = require('firebase-functions/params');
-
-const TWILIO_SID = defineString('TWILIO_SID');
-const TWILIO_TOKEN = defineString('TWILIO_TOKEN');
-const TWILIO_SMS = defineString('TWILIO_SMS');
-const PAYSTACK_SECRET = defineString('PAYSTACK_SECRET');
+const TWILIO_SID = defineString("TWILIO_SID");
+const TWILIO_TOKEN = defineString("TWILIO_TOKEN");
+const TWILIO_SMS = defineString("TWILIO_SMS");
+const PAYSTACK_SECRET = defineString("PAYSTACK_SECRET");
 const TWILIO_WHATSAPP = "whatsapp:+14155238886";
 
-const client = twilio(TWILIO_SID, TWILIO_TOKEN);
+const client = twilio(TWILIO_SID.value(), TWILIO_TOKEN.value());
 
 // -------------------- HELPERS --------------------
 async function sendMessage(phone, message, method = "sms", retries = 3) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       if (method === "whatsapp") {
-        await client.messages.create({ body: message, from: TWILIO_WHATSAPP, to: `whatsapp:${phone}` });
+        await client.messages.create({
+          body: message,
+          from: TWILIO_WHATSAPP,
+          to: `whatsapp:${phone}`,
+        });
       } else {
-        await client.messages.create({ body: message, from: TWILIO_SMS, to: phone });
+        await client.messages.create({ body: message, from: TWILIO_SMS.value(), to: phone });
       }
       return true;
     } catch (err) {
       console.error(`Attempt ${attempt} failed for ${phone}:`, err.message);
       if (attempt === retries) throw err;
-      await new Promise(res => setTimeout(res, 1000 * attempt)); // exponential backoff
+      await new Promise((res) => setTimeout(res, 1000 * attempt)); // exponential backoff
     }
   }
 }
@@ -76,7 +79,7 @@ export const createBooking = functions.https.onCall(async (data) => {
   const response = await axios.post(
     "https://api.paystack.co/transaction/initialize",
     { email, amount: Math.round(price * 100), metadata: { bookingId: bookingRef.id } },
-    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
+    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET.value()}` } }
   );
 
   return { authorization_url: response.data.data.authorization_url };
@@ -88,7 +91,7 @@ export const paystackWebhook = functions.https.onRequest(async (req, res) => {
     if (req.method !== "POST") return res.status(405).send("Method not allowed");
 
     const signature = req.headers["x-paystack-signature"];
-    const hash = crypto.createHmac("sha512", PAYSTACK_SECRET).update(JSON.stringify(req.body)).digest("hex");
+    const hash = crypto.createHmac("sha512", PAYSTACK_SECRET.value()).update(JSON.stringify(req.body)).digest("hex");
     if (hash !== signature) return res.status(400).send("Invalid signature");
 
     const event = req.body;
