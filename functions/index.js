@@ -9,10 +9,12 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // -------------------- ENV PARAMS --------------------
-const TWILIO_SID = functions.config().twilio.sid;
-const TWILIO_TOKEN = functions.config().twilio.token;
-const TWILIO_SMS = functions.config().twilio.sms;
-const PAYSTACK_SECRET = functions.config().paystack.secret;
+const { defineString } = require('firebase-functions/params');
+
+const TWILIO_SID = defineString('TWILIO_SID');
+const TWILIO_TOKEN = defineString('TWILIO_TOKEN');
+const TWILIO_SMS = defineString('TWILIO_SMS');
+const PAYSTACK_SECRET = defineString('PAYSTACK_SECRET');
 const TWILIO_WHATSAPP = "whatsapp:+14155238886";
 
 const client = twilio(TWILIO_SID, TWILIO_TOKEN);
