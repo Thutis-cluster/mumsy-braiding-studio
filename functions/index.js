@@ -1,207 +1,163 @@
-// functions/index.js
-console.log("🔥 index.js loaded");
-import { onCall, onRequest } from "firebase-functions/v2/https";
-import { defineString } from "firebase-functions/params";
+// index.js
+import { onCall } from "firebase-functions/v2/https";
+import { onRequest } from "firebase-functions/v2/https";
 import admin from "firebase-admin";
 import axios from "axios";
-import crypto from "crypto";
 import twilio from "twilio";
+import crypto from "crypto";
 
+console.log("🔥 index.js loaded");
+
+// -------------------- FIREBASE INIT --------------------
 admin.initializeApp();
 const db = admin.firestore();
 
-/* ================= ENV VARS ================= */
-const PAYSTACK_SECRET = defineString("PAYSTACK_SECRET");
-const TWILIO_SID = defineString("TWILIO_SID");
-const TWILIO_TOKEN = defineString("TWILIO_TOKEN");
-const TWILIO_SMS = defineString("TWILIO_SMS");
+// -------------------- TWILIO SETUP --------------------
+const TWILIO_SID = process.env.TWILIO_SID;
+const TWILIO_TOKEN = process.env.TWILIO_TOKEN;
+const TWILIO_SMS = process.env.TWILIO_SMS;
 const TWILIO_WHATSAPP = "whatsapp:+14155238886";
 
-let twilioClient;
+const client = twilio(TWILIO_SID, TWILIO_TOKEN);
 
-function getTwilioClient() {
-  if (!twilioClient) {
-    twilioClient = twilio(
-      TWILIO_SID.value(),
-      TWILIO_TOKEN.value()
-    );
-  }
-  return twilioClient;
-}
-
-/* ================= HELPERS ================= */
-function validateEmail(email) {
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!re.test(email)) throw new Error("Invalid email");
-  return email;
-}
-
-function validatePhone(phone) {
-  let p = phone.replace(/\D/g, "");
-  if (p.startsWith("0")) p = "27" + p.slice(1);
-  if (!/^\d{11,15}$/.test(p)) throw new Error("Invalid phone");
-  return "+" + p;
-}
-
+// -------------------- HELPERS --------------------
 async function sendMessage(phone, message, method = "sms") {
-  const client = getTwilioClient();
-
   if (method === "whatsapp") {
-    return client.messages.create({
+    await client.messages.create({
       body: message,
       from: TWILIO_WHATSAPP,
       to: `whatsapp:${phone}`,
     });
+  } else {
+    await client.messages.create({
+      body: message,
+      from: TWILIO_SMS,
+      to: phone,
+    });
   }
-
-  return client.messages.create({
-    body: message,
-    from: TWILIO_SMS.value(),
-    to: phone,
-  });
 }
 
-/* ================= CREATE BOOKING ================= */
-export const createBooking = onCall(async (request) => {
-  const {
-    style,
-    length,
-    price,
-    clientName,
-    clientPhone,
-    date,
-    time,
-    method,
-    email,
-  } = request.data;
+function validatePhone(phone) {
+  let p = String(phone).replace(/\D/g, "");
+  if (p.startsWith("0")) p = "27" + p.slice(1);
+  if (!/^\d{11,15}$/.test(p)) throw new Error("Invalid phone number");
+  return "+" + p;
+}
 
-  if (!style || !length || !price || !clientName || !clientPhone || !date || !time || !email) {
-    throw new Error("Missing fields");
-  }
+function validateEmail(email) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!re.test(email)) throw new Error("Invalid email address");
+  return email;
+}
 
-  const bookingRef = await db.collection("bookings").add({
-    style,
-    length,
-    price,
-    clientName,
-    clientPhone: validatePhone(clientPhone),
-    clientEmail: validateEmail(email),
-    date,
-    time,
-    method,
-    status: "Pending",
-    paymentStatus: "Unpaid",
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-
-  // Example: 30% deposit
-  const depositAmount = Math.round(price * 0.3 * 100);
-
-  const response = await axios.post(
-    "https://api.paystack.co/transaction/initialize",
-    {
+// -------------------- CREATE BOOKING --------------------
+export const createBooking = onCall(async (data) => {
+  try {
+    const {
+      style,
+      length,
+      price,
+      clientName,
+      clientPhone,
+      date,
+      time,
+      method,
       email,
-      amount: depositAmount,
-      metadata: { bookingId: bookingRef.id },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${PAYSTACK_SECRET.value()}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
+    } = data;
 
-  return { authorization_url: response.data.data.authorization_url };
+    if (!style || !length || !price || !clientName || !clientPhone || !date || !time || !email) {
+      throw new Error("Missing required fields");
+    }
+
+    const bookingRef = await db.collection("bookings").add({
+      style,
+      length,
+      price,
+      clientName,
+      clientPhone: validatePhone(clientPhone),
+      clientEmail: validateEmail(email),
+      date,
+      time,
+      method,
+      status: "Pending",
+      paymentStatus: "Unpaid",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const response = await axios.post(
+      "https://api.paystack.co/transaction/initialize",
+      { email, amount: Math.round(price * 100), metadata: { bookingId: bookingRef.id } },
+      { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET}` } }
+    );
+
+    return { authorization_url: response.data.data.authorization_url };
+  } catch (err) {
+    console.error("❌ createBooking failed:", err.message);
+    throw new Error("Could not start payment");
+  }
 });
 
-/* ================= PAYSTACK WEBHOOK ================= */
+// -------------------- TEST SECRETS --------------------
+export const testSecrets = onCall(() => {
+  return {
+    paystack: !!process.env.PAYSTACK_SECRET,
+    twilioSID: !!process.env.TWILIO_SID,
+    twilioToken: !!process.env.TWILIO_TOKEN,
+    twilioSMS: !!process.env.TWILIO_SMS,
+  };
+});
+
+// -------------------- PAYSTACK WEBHOOK --------------------
 export const paystackWebhook = onRequest(async (req, res) => {
   try {
+    if (req.method !== "POST") return res.status(405).send("Method not allowed");
+
     const signature = req.headers["x-paystack-signature"];
     const hash = crypto
-      .createHmac("sha512", PAYSTACK_SECRET.value())
+      .createHmac("sha512", process.env.PAYSTACK_SECRET)
       .update(JSON.stringify(req.body))
       .digest("hex");
 
-    if (hash !== signature) {
-      return res.status(400).send("Invalid signature");
-    }
+    if (hash !== signature) return res.status(400).send("Invalid signature");
 
     const event = req.body;
 
-    if (event.event !== "charge.success") {
-      return res.status(200).send("Ignored");
-    }
+    if (event.event === "charge.success") {
+      const { metadata, amount } = event.data;
+      const bookingId = metadata?.bookingId;
+      if (!bookingId) return res.status(400).send("Missing bookingId");
 
-    const { metadata, amount } = event.data;
-    const bookingId = metadata?.bookingId;
-    if (!bookingId) return res.status(400).send("No bookingId");
+      const bookingRef = db.collection("bookings").doc(bookingId);
 
-    const bookingRef = db.collection("bookings").doc(bookingId);
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(bookingRef);
+        const booking = snap.data();
+        if (!booking) throw new Error("Booking not found");
+        if (booking.paymentStatus === "Paid") return;
 
-    await db.runTransaction(async (tx) => {
-      const snap = await tx.get(bookingRef);
-      if (!snap.exists) throw new Error("Booking not found");
+        tx.update(bookingRef, {
+          paymentStatus: "Paid",
+          depositPaid: amount / 100,
+          status: "Accepted",
+          receiptEmailSent: false,
+        });
 
-      const booking = snap.data();
-      if (booking.paymentStatus === "Paid") return;
-
-      tx.update(bookingRef, {
-        paymentStatus: "Paid",
-        depositPaid: amount / 100,
-        status: "Accepted",
-        receiptEmailSent: false,
+        const message = `✅ Booking confirmed!\nHi ${booking.clientName}, your ${booking.style} (${booking.length}) appointment is confirmed.\n📅 ${booking.date}\n🕒 ${booking.time}`;
+        await sendMessage(booking.clientPhone, message, booking.method);
       });
 
-      const msg = `✅ Booking confirmed!
-Hi ${booking.clientName}
-📅 ${booking.date}
-🕒 ${booking.time}
-Style: ${booking.style}`;
+      console.log(`Booking ${bookingId} verified and confirmed.`);
+      return res.status(200).send("Webhook processed");
+    }
 
-      await sendMessage(booking.clientPhone, msg, booking.method);
-    });
-
-    return res.status(200).send("Success");
+    return res.status(200).send("Event ignored");
   } catch (err) {
-    console.error(err);
-    return res.status(500).send("Server error");
+    console.error("❌ Webhook error:", err.message);
+    return res.status(500).send("Internal Server Error");
   }
 });
 
-// -------------------- 5-HOUR REMINDERS --------------------
-export const sendFiveHourReminders = functions.pubsub.schedule("every 5 minutes").onRun(async () => {
-  const now = admin.firestore.Timestamp.now();
-  const snapshot = await db
-    .collection("bookings")
-    .where("status", "==", "Accepted")
-    .where("reminderSent", "==", false)
-    .where("reminderAt", "<=", now)
-    .get();
-
-  if (snapshot.empty) return null;
-
-  for (const doc of snapshot.docs) {
-    const booking = doc.data();
-    const message = `⏰ Reminder\nHi ${booking.clientName}, your ${booking.style} (${booking.length}) appointment is in 5 hours.\n📅 ${booking.date}\n🕒 ${booking.time}`;
-    try {
-      await sendMessage(booking.clientPhone, message, booking.method);
-
-      await db.collection("reminderLogs").add({
-        bookingId: doc.id,
-        clientName: booking.clientName,
-        phone: booking.clientPhone,
-        method: booking.method,
-        sentAt: admin.firestore.FieldValue.serverTimestamp(),
-        type: "5-hour",
-      });
-
-      await doc.ref.update({ reminderSent: true });
-    } catch (err) {
-      console.error("Reminder failed for", booking.clientPhone, err.message);
-    }
-  }
-
-  return null;
+// -------------------- TEST FUNCTION --------------------
+export const testFn = onCall(() => {
+  return { ok: true };
 });
