@@ -795,6 +795,42 @@ input:focus, select:focus {
 <div id="reminderLogs"></div>
 </div>
 
+<button id="testSecretsBtn">Test Secrets</button>
+<div id="secretsResult"></div>
+
+<script type="module">
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { initializeApp } from "firebase/app";
+
+// Initialize Firebase (use your config)
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  appId: "YOUR_APP_ID",
+};
+const app = initializeApp(firebaseConfig);
+const functions = getFunctions(app);
+
+document.getElementById("testSecretsBtn").addEventListener("click", async () => {
+  const resultDiv = document.getElementById("secretsResult");
+  try {
+    const testFn = httpsCallable(functions, "testSecrets");
+    const res = await testFn();
+    const secrets = res.data;
+    resultDiv.innerHTML = `
+      <p>Paystack Loaded: ${secrets.paystack}</p>
+      <p>Twilio SID Loaded: ${secrets.twilioSID}</p>
+      <p>Twilio Token Loaded: ${secrets.twilioToken}</p>
+      <p>Twilio SMS Loaded: ${secrets.twilioSMS}</p>
+    `;
+  } catch (err) {
+    resultDiv.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
+    console.error("Test secrets failed:", err);
+  }
+});
+</script>
+  
 <script>
   // ----------------- FIREBASE -----------------
   console.log("🔥 THIS IS THE SCRIPT RUNNING");
