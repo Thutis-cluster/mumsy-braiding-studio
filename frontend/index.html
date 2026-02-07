@@ -1303,32 +1303,58 @@ async function payDeposit() {
   if (paymentInProgress) return;
   paymentInProgress = true;
 
+  // Disable all submit buttons
   document.querySelectorAll(".submit-btn").forEach(b => b.disabled = true);
 
   try {
-    const functions = getFunctions();
-    const createBooking = httpsCallable(functions, "createBooking");
+    // Collect form values
+    const clientName = document.getElementById("clientName").value.trim();
+    const clientPhone = document.getElementById("clientPhone").value.trim();
+    const clientEmail = document.getElementById("clientEmail").value.trim() || "customer@mumsybraids.com";
+    const clientDate = document.getElementById("clientDate").value;
+    const clientTime = document.getElementById("clientTime").value;
+    const style = selectedStyle; // your existing variables
+    const length = selectedLength;
+    const price = selectedPrice;
+    const method = bookingMethod;
 
-    const res = await createBooking({
-      style: selectedStyle,
-      length: selectedLength,
-      price: selectedPrice,
-      clientName: document.getElementById("clientName").value,
-      clientPhone: document.getElementById("clientPhone").value,
-      date: document.getElementById("clientDate").value,
-      time: document.getElementById("clientTime").value,
-      method: bookingMethod,
-      email: document.getElementById("clientEmail").value,
+    // Simple validation
+    if (!clientName || !clientPhone || !clientDate || !clientTime) {
+      alert("Please fill in all required fields");
+      throw new Error("Missing fields");
+    }
+
+    // Call your Firebase function
+    const fn = firebase.functions().httpsCallable("createBooking");
+    const res = await fn({
+      style,
+      length,
+      price,
+      clientName,
+      clientPhone,
+      date: clientDate,
+      time: clientTime,
+      method,
+      email: clientEmail
     });
-    initPaystack().then(r => console.log(r.data.authorization_url));
+
+    // Redirect to Paystack
     window.location.href = res.data.authorization_url;
+
   } catch (err) {
-    console.error(err);
-    alert("❌ Payment could not start");
+    console.error("❌ Payment init failed:", err);
+    alert("❌ Could not start payment. Please check your details and try again.");
+  } finally {
     paymentInProgress = false;
     document.querySelectorAll(".submit-btn").forEach(b => b.disabled = false);
   }
 }
+
+// Optional: Add an event listener
+document.getElementById("bookingForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  payDeposit();
+});
 
 // 2️⃣ Email send function
 function sendReceiptEmail(booking, bookingId) {
