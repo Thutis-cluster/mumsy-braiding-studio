@@ -731,7 +731,9 @@ input:focus, select:focus {
 
 <input type="email" id="clientEmail" placeholder="Email (Optional)">
 
-
+<button id="testSecretsBtn">Test Secrets</button>
+<div id="secretsResult"></div>
+  
   <button class="button" onclick="showScreen('date',4)">Back</button>
 <button class="button submit-btn" onclick="handleBooking('sms')">
   ✅ Confirm Booking (SMS)
@@ -795,8 +797,7 @@ input:focus, select:focus {
 <div id="reminderLogs"></div>
 </div>
 
-<button id="testSecretsBtn">Test Secrets</button>
-<div id="secretsResult"></div>
+
 
 <script type="module">
 import { getFunctions, httpsCallable } from "firebase/functions";
