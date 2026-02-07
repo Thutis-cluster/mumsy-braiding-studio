@@ -731,9 +731,6 @@ input:focus, select:focus {
 
 <input type="email" id="clientEmail" placeholder="Email (Optional)">
 
-<button id="testSecretsBtn">Test Secrets</button>
-<div id="secretsResult"></div>
-  
   <button class="button" onclick="showScreen('date',4)">Back</button>
 <button class="button submit-btn" onclick="handleBooking('sms')">
   ✅ Confirm Booking (SMS)
@@ -796,41 +793,6 @@ input:focus, select:focus {
   <h3>🧾 Reminder Logs</h3>
 <div id="reminderLogs"></div>
 </div>
-
-
-
-<script type="module">
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { initializeApp } from "firebase/app";
-
-// Initialize Firebase (use your config)
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  appId: "YOUR_APP_ID",
-};
-const app = initializeApp(firebaseConfig);
-const functions = getFunctions(app);
-
-document.getElementById("testSecretsBtn").addEventListener("click", async () => {
-  const resultDiv = document.getElementById("secretsResult");
-  try {
-    const testFn = httpsCallable(functions, "testSecrets");
-    const res = await testFn();
-    const secrets = res.data;
-    resultDiv.innerHTML = `
-      <p>Paystack Loaded: ${secrets.paystack}</p>
-      <p>Twilio SID Loaded: ${secrets.twilioSID}</p>
-      <p>Twilio Token Loaded: ${secrets.twilioToken}</p>
-      <p>Twilio SMS Loaded: ${secrets.twilioSMS}</p>
-    `;
-  } catch (err) {
-    resultDiv.innerHTML = `<p style="color:red;">Error: ${err.message}</p>`;
-    console.error("Test secrets failed:", err);
-  }
-});
-</script>
   
 <script>
   // ----------------- FIREBASE -----------------
