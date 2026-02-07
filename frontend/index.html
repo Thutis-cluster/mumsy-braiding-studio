@@ -1320,7 +1320,7 @@ async function payDeposit() {
       method: bookingMethod,
       email: document.getElementById("clientEmail").value,
     });
-
+    initPaystack().then(r => console.log(r.data.authorization_url));
     window.location.href = res.data.authorization_url;
   } catch (err) {
     console.error(err);
