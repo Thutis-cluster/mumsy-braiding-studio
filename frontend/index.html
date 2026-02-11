@@ -795,6 +795,11 @@ input:focus, select:focus {
 </div>
   
 <script>
+
+  window.onerror = function (msg, src, line, col, err) {
+  alert("JS crashed: " + msg + " at line " + line);
+};
+
   // ----------------- FIREBASE -----------------
   console.log("🔥 THIS IS THE SCRIPT RUNNING");
 
@@ -1326,7 +1331,12 @@ function validateClientForm() {
   });
 }
 
-let paymentInProgress = false;
+const bookingForm = document.getElementById("bookingForm");
+const clientName = document.getElementById("clientName");
+const clientPhone = document.getElementById("clientPhone");
+const clientEmail = document.getElementById("clientEmail");
+const clientDate = document.getElementById("clientDate");
+const clientTime = document.getElementById("clientTime");
 
 async function payDeposit() {
   if (paymentInProgress) return;
