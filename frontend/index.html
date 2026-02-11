@@ -878,7 +878,7 @@ async function handleBooking(method) {
   }
 
   try {
-    const fn = firebase.functions().httpsCallable("createBooking");
+const fn = functions.httpsCallable("createBooking");
 
     const res = await fn({
       style: selectedStyle,
