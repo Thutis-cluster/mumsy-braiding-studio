@@ -1326,11 +1326,6 @@ function validateClientForm() {
   });
 }
 
-import { getFunctions, httpsCallable } from "firebase/functions";
-
-const functions = getFunctions();
-const createBooking = httpsCallable(functions, "createBooking");
-
 let paymentInProgress = false;
 
 async function payDeposit() {
