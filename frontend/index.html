@@ -817,6 +817,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 console.log("Firebase connected:", firebase.apps.length > 0);
 const auth = firebase.auth();
+const functions = firebase.functions(); // ✅ ADD THIS
 
   console.log("🔥 Firebase initialized");
   
