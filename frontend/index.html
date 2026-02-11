@@ -9,6 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
 
 <!---- Paystack SDKs ------>
@@ -1331,7 +1332,6 @@ function validateClientForm() {
   });
 }
 
-const bookingForm = document.getElementById("bookingForm");
 const clientName = document.getElementById("clientName");
 const clientPhone = document.getElementById("clientPhone");
 const clientEmail = document.getElementById("clientEmail");
@@ -1369,11 +1369,6 @@ async function payDeposit() {
     paymentInProgress = false;
   }
 }
-
-bookingForm.addEventListener("submit", e => {
-  e.preventDefault();
-  payDeposit();
-});
 
 // 2️⃣ Email send function
 function sendReceiptEmail(booking, bookingId) {
