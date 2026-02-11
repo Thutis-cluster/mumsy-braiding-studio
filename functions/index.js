@@ -51,8 +51,10 @@ function validateEmail(email) {
 }
 
 // -------------------- CREATE BOOKING --------------------
-export const createBooking = onCall(async (data) => {
+export const createBooking = onCall(async (request) => {
   try {
+    const data = request.data;
+
     const {
       style,
       length,
@@ -64,6 +66,7 @@ export const createBooking = onCall(async (data) => {
       method,
       email,
     } = data;
+
 
     if (!style || !length || !price || !clientName || !clientPhone || !date || !time || !email) {
       throw new Error("Missing required fields");
