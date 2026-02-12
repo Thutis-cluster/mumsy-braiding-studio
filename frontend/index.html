@@ -1354,7 +1354,8 @@ async function payDeposit() {
       method: bookingMethod
     };
 
-  const res = await fn(payload);
+const fn = functions.httpsCallable("createBooking");
+const res = await fn(payload);
 
     if (res.data.authorization_url) {
       window.location.href = res.data.authorization_url;
