@@ -982,6 +982,19 @@ const times = {
   "CornRows": { Simple: "30 minutes" },
   "Ben & Betty": { Simple: "20 minutes" }
 };
+
+function sendWhatsAppToAdmin(booking) {
+  console.log("WhatsApp to admin:", booking);
+}
+
+function sendWhatsAppToClient(booking, message) {
+  console.log("WhatsApp to client:", booking.clientPhone, message);
+}
+
+function sendSmsToClient(booking, message) {
+  if (!booking?.clientPhone) return;
+  sendSMS(booking.clientPhone, message);
+}
   
   function formatPhoneForWhatsApp(phone) {
     let cleaned = phone.replace(/\D/g, ''); // remove non-digits
@@ -1688,7 +1701,12 @@ function forgotAdminPassword() {
 }
 
 auth.onAuthStateChanged(user => {
-  const adminBtn = document.getElementById("adminBtn");
+const adminBtn = document.getElementById("adminBtn");
+if (adminBtn) {
+  adminBtn.addEventListener("click", () => {
+    showAdminModal();
+  });
+}
 
   if (!user) {
     adminBtn.style.display = "block";
