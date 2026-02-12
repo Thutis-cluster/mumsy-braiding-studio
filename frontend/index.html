@@ -797,9 +797,11 @@ input:focus, select:focus {
   
 <script>
 
-  window.onerror = function (msg, src, line, col, err) {
-  alert("JS crashed: " + msg + " at line " + line);
+window.onerror = function (msg, src, line, col, err) {
+  console.error("JS crashed:", msg, "at line", line, err);
 };
+
+document.addEventListener("DOMContentLoaded", () => {
 
   // ----------------- FIREBASE -----------------
   console.log("🔥 THIS IS THE SCRIPT RUNNING");
@@ -933,33 +935,14 @@ const fn = functions.httpsCallable("createBooking");
     if (stepEl) stepEl.classList.add('active');
   }
 
-     if (id === "date") {
-  const now = new Date();
-  currentYear = now.getFullYear();
-  currentMonth = now.getMonth();
-
-  loadAdminClosedDays(currentYear);
-  renderCalendar(currentYear, currentMonth);
-
-  setTimeout(enableCalendarSwipe, 100);
-}
-
-if (id === "date") {
-  const now = new Date();
-  currentYear = now.getFullYear();
-  currentMonth = now.getMonth();
-  renderCalendar(currentYear, currentMonth);
-}
-
   if (id === "date") {
   const now = new Date();
   currentYear = now.getFullYear();
   currentMonth = now.getMonth();
+  loadAdminClosedDays(currentYear);
   renderCalendar(currentYear, currentMonth);
-
-  setTimeout(enableCalendarSwipe, 100); // ✅ enable swipe
+  setTimeout(enableCalendarSwipe, 100);
 }
-
   if (id === "confirmation") displayConfirmation();
 }
 
@@ -1953,6 +1936,8 @@ setInterval(() => {
       });
     });
 }, 5 * 60 * 1000); // every 5 minutes
+
+  });
           
 </script>
 
