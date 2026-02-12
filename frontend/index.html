@@ -1479,7 +1479,7 @@ function sendWhatsAppBooking(booking, method) {
   );
 }
 
-  function sendSMS(booking.clientPhone, message) {
+function sendSMS(phone, message) {
 fetch("https://us-central1-mumsy-braiding-booking.cloudfunctions.net/sendSMS", {
 // Replace with your live server URL in production
         method: "POST",
