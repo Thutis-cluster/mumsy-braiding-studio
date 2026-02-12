@@ -1398,7 +1398,8 @@ db.collection("bookings")
   .where("receiptEmailSent", "==", false)
   .onSnapshot(snapshot => {
     snapshot.docChanges().forEach(change => {
-      if (change.type === "modified") {
+if (change.type === "added" || change.type === "modified")
+{
         const booking = change.doc.data();
         sendReceiptEmail(booking, change.doc.id);
       }
