@@ -1357,7 +1357,7 @@ async function payDeposit() {
       method: bookingMethod
     };
 
-    const res = await createBooking(payload);
+  const res = await fn(payload);
 
     if (res.data.authorization_url) {
       window.location.href = res.data.authorization_url;
@@ -1481,8 +1481,8 @@ function sendWhatsAppBooking(booking, method) {
   );
 }
 
-  function sendSMS(phone, message) {
-fetch("https://us-central1-mumsy-braids-booking.cloudfunctions.net/sendSMS", {
+  function sendSMS(booking.clientPhone, message) {
+fetch("https://us-central1-mumsy-braiding-booking.cloudfunctions.net/sendSMS", {
 // Replace with your live server URL in production
         method: "POST",
         headers: { "Content-Type": "application/json" },
