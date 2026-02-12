@@ -908,18 +908,32 @@ const fn = functions.httpsCallable("createBooking");
     alert("❌ Could not complete booking. Please try again.");
   }
 }
-  
+
   // ----------------- SCREEN NAVIGATION -----------------
-function showScreen(id, step) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+  function showScreen(id, step) {
+  document.querySelectorAll('.screen')
+    .forEach(s => s.classList.remove('active'));
 
-  for (let i = 1; i <= 5; i++)
-    document.getElementById('step'+i).classList.remove('active');
-  for (let i = 1; i <= step; i++)
-    document.getElementById('step'+i).classList.add('active');
+  const target = document.getElementById(id);
 
-  if (id === "date") {
+  if (!target) {
+    console.error("Screen not found:", id);
+    return;
+  }
+
+  target.classList.add('active');
+
+  for (let i = 1; i <= 5; i++) {
+    const stepEl = document.getElementById('step' + i);
+    if (stepEl) stepEl.classList.remove('active');
+  }
+
+  for (let i = 1; i <= step; i++) {
+    const stepEl = document.getElementById('step' + i);
+    if (stepEl) stepEl.classList.add('active');
+  }
+
+     if (id === "date") {
   const now = new Date();
   currentYear = now.getFullYear();
   currentMonth = now.getMonth();
