@@ -9,7 +9,6 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-functions-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
 
 <!---- Paystack SDKs ------>
@@ -634,7 +633,7 @@ input:focus, select:focus {
   </button>
 
   <!-- Admin button hidden by default -->
-  <button class="button" id="adminBtn" onclick="showAdminModal()">
+  <button class="button" id="adminBtn" onclick="showScreen('adminLogin',1)">
     💼 Owner Admin Panel
   </button>
 </div>
@@ -661,7 +660,7 @@ input:focus, select:focus {
   </div>
 
  <div class="style-card">
-    <img src="images/benny-betty-20.jpg" alt="Ben & Betty">
+    <img src="images/benny-betty-20.jpg" alt="Ben & Betty</">
     <p><strong>Ben & Betty</strong></p>
     <button class="button" onclick="selectStyle('Ben & Betty')">Select</button>
   </div>
@@ -732,6 +731,7 @@ input:focus, select:focus {
 
 <input type="email" id="clientEmail" placeholder="Email (Optional)">
 
+
   <button class="button" onclick="showScreen('date',4)">Back</button>
 <button class="button submit-btn" onclick="handleBooking('sms')">
   ✅ Confirm Booking (SMS)
@@ -794,33 +794,24 @@ input:focus, select:focus {
   <h3>🧾 Reminder Logs</h3>
 <div id="reminderLogs"></div>
 </div>
-  
+
 <script>
-
-window.onerror = function (msg, src, line, col, err) {
-  console.error("JS crashed:", msg, "at line", line, err);
-};
-
-document.addEventListener("DOMContentLoaded", () => {
-
   // ----------------- FIREBASE -----------------
   console.log("🔥 THIS IS THE SCRIPT RUNNING");
 
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyCcChD_9sMvxncp7hulcwhKlUyJ87BR7zs",
-  authDomain: "braiding-bookings.firebaseapp.com",
-  projectId: "braiding-bookings",
-  storageBucket: "braiding-bookings.firebasestorage.app",
-  messagingSenderId: "243406972406",
-  appId: "1:243406972406:web:2ab34ed5ab3491af5553d7",
-  measurementId: "G-4XLV27JNW8"
+  apiKey: "AIzaSyDYzO6pW5fjL6OhKrtELohjpzev8znveys",
+  authDomain: "mumsy-braids-booking.firebaseapp.com",
+  projectId: "mumsy-braids-booking",
+  storageBucket: "mumsy-braids-booking.firebasestorage.app",
+  messagingSenderId: "494103742106",
+  appId: "1:494103742106:web:9b8f7cfd4430d045bec123",
+  measurementId: "G-090W6YHJ09"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 console.log("Firebase connected:", firebase.apps.length > 0);
 const auth = firebase.auth();
-const functions = firebase.functions(); // ✅ ADD THIS
 
   console.log("🔥 Firebase initialized");
   
@@ -858,7 +849,6 @@ const DEPOSIT_THRESHOLD = 100; // R100
 const DEPOSIT_PERCENT = 0.45;
 
 function getDeposit(price) {
-  if (price < DEPOSIT_THRESHOLD) return 0;
   return Math.round(price * DEPOSIT_PERCENT);
 }
 
@@ -866,83 +856,57 @@ function getBalance(price) {
   return price - getDeposit(price);
 }
   
-async function handleBooking(method) {
+function handleBooking(method) {
   bookingMethod = method;
 
-  const clientName = document.getElementById("clientName").value.trim();
-  const clientPhone = document.getElementById("clientPhone").value.trim();
-  const clientEmail =
-    document.getElementById("clientEmail").value.trim() || "customer@mumsybraids.com";
-  const date = document.getElementById("clientDate").value;
-  const time = document.getElementById("clientTime").value;
-
-  if (!clientName || !clientPhone || !date || !time) {
-    alert("⚠️ Please fill in all required fields");
-    return;
-  }
-
-  try {
-const fn = functions.httpsCallable("createBooking");
-
-    const res = await fn({
-      style: selectedStyle,
-      length: selectedLength,
-      price: selectedPrice,
-      clientName,
-      clientPhone,
-      email: clientEmail,
-      date,
-      time,
-      method
+  if (selectedPrice >= DEPOSIT_THRESHOLD) {
+    payDeposit();
+  } else {
+    saveBooking({
+      paymentStatus: "No Deposit Required",
+      depositPaid: 0,
+      balanceRemaining: selectedPrice
     });
-
-    // 💰 Deposit required
-    if (res.data.authorization_url) {
-      window.location.href = res.data.authorization_url;
-    } else {
-      // ❌ No deposit required
-      localStorage.setItem("latestBooking", JSON.stringify(res.data.booking));
-      showScreen("confirmation", 5);
-    }
-
-  } catch (err) {
-    console.error("❌ Booking failed:", err);
-    alert("❌ Could not complete booking. Please try again.");
   }
 }
-
+  
   // ----------------- SCREEN NAVIGATION -----------------
-  function showScreen(id, step) {
-  document.querySelectorAll('.screen')
-    .forEach(s => s.classList.remove('active'));
+function showScreen(id, step) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
 
-  const target = document.getElementById(id);
-
-  if (!target) {
-    console.error("Screen not found:", id);
-    return;
-  }
-
-  target.classList.add('active');
-
-  for (let i = 1; i <= 5; i++) {
-    const stepEl = document.getElementById('step' + i);
-    if (stepEl) stepEl.classList.remove('active');
-  }
-
-  for (let i = 1; i <= step; i++) {
-    const stepEl = document.getElementById('step' + i);
-    if (stepEl) stepEl.classList.add('active');
-  }
+  for (let i = 1; i <= 5; i++)
+    document.getElementById('step'+i).classList.remove('active');
+  for (let i = 1; i <= step; i++)
+    document.getElementById('step'+i).classList.add('active');
 
   if (id === "date") {
   const now = new Date();
   currentYear = now.getFullYear();
   currentMonth = now.getMonth();
+
   loadAdminClosedDays(currentYear);
   renderCalendar(currentYear, currentMonth);
+
   setTimeout(enableCalendarSwipe, 100);
 }
+
+if (id === "date") {
+  const now = new Date();
+  currentYear = now.getFullYear();
+  currentMonth = now.getMonth();
+  renderCalendar(currentYear, currentMonth);
+}
+
+  if (id === "date") {
+  const now = new Date();
+  currentYear = now.getFullYear();
+  currentMonth = now.getMonth();
+  renderCalendar(currentYear, currentMonth);
+
+  setTimeout(enableCalendarSwipe, 100); // ✅ enable swipe
+}
+
   if (id === "confirmation") displayConfirmation();
 }
 
@@ -982,19 +946,6 @@ const times = {
   "CornRows": { Simple: "30 minutes" },
   "Ben & Betty": { Simple: "20 minutes" }
 };
-
-function sendWhatsAppToAdmin(booking) {
-  console.log("WhatsApp to admin:", booking);
-}
-
-function sendWhatsAppToClient(booking, message) {
-  console.log("WhatsApp to client:", booking.clientPhone, message);
-}
-
-function sendSmsToClient(booking, message) {
-  if (!booking?.clientPhone) return;
-  sendSMS(booking.clientPhone, message);
-}
   
   function formatPhoneForWhatsApp(phone) {
     let cleaned = phone.replace(/\D/g, ''); // remove non-digits
@@ -1109,6 +1060,34 @@ function selectLength(length) {
       console.error("Date check failed:", err);
     });
 }
+/*----------
+// ----------------- SAVE BOOKING -----------------
+  function saveBookingToFirebase() {
+const booking = {
+  style: selectedStyle,
+  length: selectedLength,
+  price: selectedPrice,
+  timeEstimate: selectedTimeEstimate, // ← add this
+  clientName: document.getElementById("clientName").value,
+  clientPhone: document.getElementById("clientPhone").value,
+  clientEmail: document.getElementById("clientEmail").value,
+  date: document.getElementById("clientDate").value,
+  time: document.getElementById("clientTime").value,
+  status: "Pending",
+  createdAt: firebase.firestore.FieldValue.serverTimestamp()
+};
+
+  db.collection("bookings").add(booking)
+    .then((docRef) => {
+      sendWhatsAppToAdmin(booking);
+      console.log("Booking saved:", docRef.id);
+      booking.id = docRef.id;
+      localStorage.setItem("latestBooking", JSON.stringify(booking));
+      showScreen("confirmation",5);
+      sendWhatsAppToClient(booking, "Thank you for your booking! Your appointment is pending confirmation.");
+    })
+    .catch(err => alert("Error saving booking. Check Firestore rules: "+err));
+} ---------------*/
 
 function changeMonth(direction) {
   const calendar = document.getElementById("calendar");
@@ -1344,43 +1323,93 @@ function validateClientForm() {
   });
 }
 
-const clientName = document.getElementById("clientName");
-const clientPhone = document.getElementById("clientPhone");
-const clientEmail = document.getElementById("clientEmail");
-const clientDate = document.getElementById("clientDate");
-const clientTime = document.getElementById("clientTime");
+/*------ function saveBookingWithoutPayment() {
+  const booking = {
+    style: selectedStyle,
+    length: selectedLength,
+    price: selectedPrice,
+    depositPaid: 0,
+    balanceRemaining: selectedPrice,
+    paymentStatus: "No Deposit Required",
+    timeEstimate: selectedTimeEstimate,
 
-async function payDeposit() {
+    clientName: document.getElementById("clientName").value,
+    clientPhone: document.getElementById("clientPhone").value,
+    clientEmail: document.getElementById("clientEmail").value,
+    date: document.getElementById("clientDate").value,
+    time: document.getElementById("clientTime").value,
+
+    status: "Pending",
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  db.collection("bookings").add(booking)
+    .then(docRef => {
+      booking.id = docRef.id;
+      localStorage.setItem("latestBooking", JSON.stringify(booking));
+
+      sendWhatsAppToAdmin(booking);
+      sendWhatsAppToClient(
+        booking,
+        "✅ Booking confirmed. No deposit was required."
+      );
+
+      showScreen("confirmation", 5);
+    })
+    .catch(err => {
+      alert("❌ Error saving booking.");
+      console.error(err);
+    });
+}  ------*/
+
+function payDeposit() {
   if (paymentInProgress) return;
   paymentInProgress = true;
 
-  try {
-    const payload = {
-      style: selectedStyle,
-      length: selectedLength,
-      price: selectedPrice,
-      clientName: clientName.value.trim(),
-      clientPhone: clientPhone.value.trim(),
-      email: clientEmail.value.trim(),
-      date: clientDate.value,
-      time: clientTime.value,
-      method: bookingMethod
-    };
+  document.querySelectorAll(".submit-btn").forEach(btn => {
+    btn.disabled = true;
+  });
 
-const fn = functions.httpsCallable("createBooking");
-const res = await fn(payload);
+  const emailInput = document.getElementById("clientEmail").value.trim();
+  const email = emailInput !== "" ? emailInput : "customer@mumsybraids.com";
 
-    if (res.data.authorization_url) {
-      window.location.href = res.data.authorization_url;
-    } else {
-      alert("Booking confirmed!");
-    }
+  const deposit = getDeposit(selectedPrice);
 
-  } catch (e) {
-    alert("Something went wrong. Please try again.");
-  } finally {
-    paymentInProgress = false;
-  }
+  const handler = PaystackPop.setup({
+    key: "pk_test_b509dd03ae654c59a3449ed06766fe904b500d0e",
+    email: email,
+    amount: deposit * 100,
+    currency: "ZAR",
+    ref: "MUMSY_" + Date.now(),
+
+      metadata: {
+    custom_fields: [
+      { display_name: "Client Name", value: document.getElementById("clientName").value },
+      { display_name: "Style", value: selectedStyle },
+      { display_name: "Date", value: document.getElementById("clientDate").value },
+      { display_name: "Time", value: document.getElementById("clientTime").value }
+    ]
+  },
+
+    callback: function (res) {
+     console.log("💳 Payment success:", res);
+
+      saveBooking({
+        depositPaid: deposit,
+        balanceRemaining: getBalance(selectedPrice),
+        paymentReference: res.reference,
+        paymentStatus: "Deposit Paid"
+      });
+    },
+
+onClose: function () {
+  paymentInProgress = false;
+  document.querySelectorAll(".submit-btn").forEach(btn => btn.disabled = false);
+  alert("❌ Payment cancelled. Booking not completed.");
+}
+  });
+
+  handler.openIframe();
 }
 
 // 2️⃣ Email send function
@@ -1411,8 +1440,7 @@ db.collection("bookings")
   .where("receiptEmailSent", "==", false)
   .onSnapshot(snapshot => {
     snapshot.docChanges().forEach(change => {
-if (change.type === "added" || change.type === "modified")
-{
+      if (change.type === "modified") {
         const booking = change.doc.data();
         sendReceiptEmail(booking, change.doc.id);
       }
@@ -1480,6 +1508,48 @@ const TIME_PER_SLOT_MINUTES = 90; // 1.5 hours
   });
 }
 
+// Send WhatsApp to ADMIN
+function sendWhatsAppToAdmin(booking) {
+  const adminPhone = "27794380103";
+
+  const message =
+    "📢 NEW BOOKING RECEIVED\n\n" +
+    `👤 Name: ${booking.clientName}\n` +
+    `📞 Phone: ${booking.clientPhone}\n` +
+    `💇 Style: ${booking.style}\n` +
+    `📏 Length: ${booking.length}\n` +
+    `💰 Price: R${booking.price}\n` +
+    `📅 Date: ${booking.date}\n` +
+    `🕒 Time: ${booking.time}`;
+
+  window.open(
+    `https://wa.me/${adminPhone}?text=${encodeURIComponent(message)}`,
+    "_blank"
+  );
+}
+
+// Send WhatsApp to CLIENT
+function sendWhatsAppToClient(booking, intro = "") {
+    const formattedPhone = formatPhoneForWhatsApp(booking.clientPhone);
+    const message = `
+${intro}
+Hello ${booking.clientName},
+💇 Style: ${booking.style}
+📏 Length: ${booking.length}
+💰 Price: R${booking.price}
+📅 Date: ${booking.date}
+🕒 Time: ${booking.time}
+📌 Status: ${booking.status}
+
+Hair Prep: Wash & dry hair before appointment
+Cancellation: 24h notice required
+    `;
+    window.open(
+        `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`,
+        "_blank"
+    );
+}
+
 function sendWhatsAppBooking(booking, method) {
   if (method !== "whatsapp") return;
 
@@ -1493,8 +1563,8 @@ function sendWhatsAppBooking(booking, method) {
   );
 }
 
-function sendSMS(phone, message) {
-fetch("https://us-central1-mumsy-braiding-booking.cloudfunctions.net/sendSMS", {
+  function sendSMS(phone, message) {
+fetch("https://us-central1-mumsy-braids-booking.cloudfunctions.net/sendSMS", {
 // Replace with your live server URL in production
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1506,6 +1576,40 @@ fetch("https://us-central1-mumsy-braiding-booking.cloudfunctions.net/sendSMS", {
         else console.error("SMS failed:", data.error);
     })
     .catch(err => console.error("Error sending SMS:", err));
+}
+
+
+// Send SMS to client
+function sendSmsToClient(booking, messageIntro = "") {
+  // Clean the phone number (keep only digits)
+  const phone = booking.clientPhone.replace(/\D/g, '');
+
+  // Construct the SMS message (plain text only)
+  const message = `${messageIntro}\nHello ${booking.clientName},\nYour booking details:\n` +
+                  `Style: ${booking.style}\n` +
+                  `Length: ${booking.length}\n` +
+                  `Price: R${booking.price}\n` +
+                  `Date: ${booking.date}\n` +
+                  `Time: ${booking.time}\n` +
+                  `Status: ${booking.status}\n` +
+                  `Hair Prep: Wash & dry hair before appointment\n` +
+                  `Cancellation: 24h notice required`;
+
+  // Send request to your server to trigger Twilio SMS
+fetch("https://us-central1-mumsy-braids-booking.cloudfunctions.net/sendSMS", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, message })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      console.log("SMS sent successfully!");
+    } else {
+      console.error("Failed to send SMS:", data.error);
+    }
+  })
+  .catch(err => console.error("Error sending SMS:", err));
 }
 
       // ----------------- REMINDERS -----------------
@@ -1701,12 +1805,7 @@ function forgotAdminPassword() {
 }
 
 auth.onAuthStateChanged(user => {
-const adminBtn = document.getElementById("adminBtn");
-if (adminBtn) {
-  adminBtn.addEventListener("click", () => {
-    showAdminModal();
-  });
-}
+  const adminBtn = document.getElementById("adminBtn");
 
   if (!user) {
     adminBtn.style.display = "block";
@@ -1956,8 +2055,6 @@ setInterval(() => {
       });
     });
 }, 5 * 60 * 1000); // every 5 minutes
-
-  });
           
 </script>
 
