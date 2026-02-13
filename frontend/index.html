@@ -797,6 +797,9 @@ input:focus, select:focus {
 
 <script>
   // ----------------- FIREBASE -----------------
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
+const functions = getFunctions();
+
   console.log("🔥 THIS IS THE SCRIPT RUNNING");
 
 const firebaseConfig = {
@@ -840,35 +843,6 @@ const PUBLIC_HOLIDAYS = [
   "2026-12-16", // Day of Reconciliation
   "2026-12-25"  // Christmas Day
 ];
-
-let paymentInProgress = false;
-let bookingMethod = null;
-
-
-const DEPOSIT_THRESHOLD = 100; // R100
-const DEPOSIT_PERCENT = 0.45;
-
-function getDeposit(price) {
-  return Math.round(price * DEPOSIT_PERCENT);
-}
-
-function getBalance(price) {
-  return price - getDeposit(price);
-}
-  
-function handleBooking(method) {
-  bookingMethod = method;
-
-  if (selectedPrice >= DEPOSIT_THRESHOLD) {
-    payDeposit();
-  } else {
-    saveBooking({
-      paymentStatus: "No Deposit Required",
-      depositPaid: 0,
-      balanceRemaining: selectedPrice
-    });
-  }
-}
   
   // ----------------- SCREEN NAVIGATION -----------------
 function showScreen(id, step) {
@@ -1060,34 +1034,6 @@ function selectLength(length) {
       console.error("Date check failed:", err);
     });
 }
-/*----------
-// ----------------- SAVE BOOKING -----------------
-  function saveBookingToFirebase() {
-const booking = {
-  style: selectedStyle,
-  length: selectedLength,
-  price: selectedPrice,
-  timeEstimate: selectedTimeEstimate, // ← add this
-  clientName: document.getElementById("clientName").value,
-  clientPhone: document.getElementById("clientPhone").value,
-  clientEmail: document.getElementById("clientEmail").value,
-  date: document.getElementById("clientDate").value,
-  time: document.getElementById("clientTime").value,
-  status: "Pending",
-  createdAt: firebase.firestore.FieldValue.serverTimestamp()
-};
-
-  db.collection("bookings").add(booking)
-    .then((docRef) => {
-      sendWhatsAppToAdmin(booking);
-      console.log("Booking saved:", docRef.id);
-      booking.id = docRef.id;
-      localStorage.setItem("latestBooking", JSON.stringify(booking));
-      showScreen("confirmation",5);
-      sendWhatsAppToClient(booking, "Thank you for your booking! Your appointment is pending confirmation.");
-    })
-    .catch(err => alert("Error saving booking. Check Firestore rules: "+err));
-} ---------------*/
 
 function changeMonth(direction) {
   const calendar = document.getElementById("calendar");
@@ -1323,172 +1269,39 @@ function validateClientForm() {
   });
 }
 
-/*------ function saveBookingWithoutPayment() {
-  const booking = {
-    style: selectedStyle,
-    length: selectedLength,
-    price: selectedPrice,
-    depositPaid: 0,
-    balanceRemaining: selectedPrice,
-    paymentStatus: "No Deposit Required",
-    timeEstimate: selectedTimeEstimate,
+/* ----------------- FORM SUBMIT (Cloud Function) ----------------- */
+document.getElementById("bookingForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-    clientName: document.getElementById("clientName").value,
-    clientPhone: document.getElementById("clientPhone").value,
-    clientEmail: document.getElementById("clientEmail").value,
-    date: document.getElementById("clientDate").value,
-    time: document.getElementById("clientTime").value,
+  const payBtn = document.getElementById("payBtn");
 
-    status: "Pending",
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  };
+  try {
+    payBtn.disabled = true;
+    payBtn.innerText = "Processing...";
 
-  db.collection("bookings").add(booking)
-    .then(docRef => {
-      booking.id = docRef.id;
-      localStorage.setItem("latestBooking", JSON.stringify(booking));
+    const data = {
+      style: document.getElementById("style").value,
+      length: document.getElementById("length").value,
+      clientName: document.getElementById("name").value,
+      clientPhone: document.getElementById("phone").value,
+      date: document.getElementById("date").value,
+      time: document.getElementById("time").value,
+      method: document.getElementById("method").value,
+      email: document.getElementById("email").value,
+    };
 
-      sendWhatsAppToAdmin(booking);
-      sendWhatsAppToClient(
-        booking,
-        "✅ Booking confirmed. No deposit was required."
-      );
+    const response = await createBooking(data);
 
-      showScreen("confirmation", 5);
-    })
-    .catch(err => {
-      alert("❌ Error saving booking.");
-      console.error(err);
-    });
-}  ------*/
+    // Redirect to Paystack (secure server-side created link)
+    window.location.href = response.data.authorization_url;
 
-function payDeposit() {
-  if (paymentInProgress) return;
-  paymentInProgress = true;
-
-  document.querySelectorAll(".submit-btn").forEach(btn => {
-    btn.disabled = true;
-  });
-
-  const emailInput = document.getElementById("clientEmail").value.trim();
-  const email = emailInput !== "" ? emailInput : "customer@mumsybraids.com";
-
-  const deposit = getDeposit(selectedPrice);
-
-  const handler = PaystackPop.setup({
-    key: "pk_test_b509dd03ae654c59a3449ed06766fe904b500d0e",
-    email: email,
-    amount: deposit * 100,
-    currency: "ZAR",
-    ref: "MUMSY_" + Date.now(),
-
-      metadata: {
-    custom_fields: [
-      { display_name: "Client Name", value: document.getElementById("clientName").value },
-      { display_name: "Style", value: selectedStyle },
-      { display_name: "Date", value: document.getElementById("clientDate").value },
-      { display_name: "Time", value: document.getElementById("clientTime").value }
-    ]
-  },
-
-    callback: function (res) {
-     console.log("💳 Payment success:", res);
-
-      saveBooking({
-        depositPaid: deposit,
-        balanceRemaining: getBalance(selectedPrice),
-        paymentReference: res.reference,
-        paymentStatus: "Deposit Paid"
-      });
-    },
-
-onClose: function () {
-  paymentInProgress = false;
-  document.querySelectorAll(".submit-btn").forEach(btn => btn.disabled = false);
-  alert("❌ Payment cancelled. Booking not completed.");
-}
-  });
-
-  handler.openIframe();
-}
-
-// 2️⃣ Email send function
-function sendReceiptEmail(booking, bookingId) {
-  emailjs.send(
-    "SERVICE_ID",
-    "booking_receipt",
-    {
-      to_email: booking.clientEmail,
-      client_name: booking.clientName,
-      style: booking.style,
-      length: booking.length,
-      price: booking.price,
-      deposit: booking.depositPaid,
-      date: booking.date,
-      time: booking.time,
-    }
-  ).then(() => {
-    db.collection("bookings").doc(bookingId).update({
-      receiptEmailSent: true
-    });
-  });
-}
-
-// 3️⃣ 👇 FIRESTORE LISTENER (ADD HERE)
-db.collection("bookings")
-.where("paymentStatus", "in", ["Deposit Paid", "Paid"])
-  .where("receiptEmailSent", "==", false)
-  .onSnapshot(snapshot => {
-    snapshot.docChanges().forEach(change => {
-      if (change.type === "modified") {
-        const booking = change.doc.data();
-        sendReceiptEmail(booking, change.doc.id);
-      }
-    });
-  });
-  
-function saveBooking(paymentData = {}) {
-  if (!bookingMethod) {
-    alert("❌ Booking method missing");
-    return;
+  } catch (error) {
+    alert("Booking failed. Please try again.");
+    payBtn.disabled = false;
+    payBtn.innerText = "Book Now";
   }
-
-  const booking = {
-    style: selectedStyle,
-    length: selectedLength,
-    price: selectedPrice,
-    timeEstimate: selectedTimeEstimate,
-
-    clientName: document.getElementById("clientName").value,
-    clientPhone: document.getElementById("clientPhone").value,
-    clientEmail: document.getElementById("clientEmail").value,
-
-    date: document.getElementById("clientDate").value,
-    time: document.getElementById("clientTime").value,
-
-    method: bookingMethod, // ✅ REQUIRED BY RULES
-    status: "Pending",
-
-    depositPaid: paymentData.depositPaid || 0,
-    balanceRemaining: paymentData.balanceRemaining || selectedPrice,
-    paymentReference: paymentData.paymentReference || null,
-    paymentStatus: paymentData.paymentStatus || "Unpaid",
-
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  };
-
-  /*------  db.collection("bookings").add(booking)
-    .then(docRef => {
-      booking.id = docRef.id;
-      localStorage.setItem("latestBooking", JSON.stringify(booking));
-      showScreen("confirmation", 5);
-    })
-    .catch(err => {
-      console.error("🔥 Firestore write blocked:", err);
-      alert("❌ Failed to save booking");
-    });  -----*/
-}
-
+});
+  
 function getMinutesFromEstimate(estimate) {
   // Example: "3 – 4 hours" → take MAX value
   const numbers = estimate.match(/\d+(\.\d+)?/g);
@@ -1506,212 +1319,6 @@ const TIME_PER_SLOT_MINUTES = 90; // 1.5 hours
   Array.from(select.options).forEach(option => {
     option.disabled = requiredMinutes > TIME_PER_SLOT_MINUTES;
   });
-}
-
-// Send WhatsApp to ADMIN
-function sendWhatsAppToAdmin(booking) {
-  const adminPhone = "27794380103";
-
-  const message =
-    "📢 NEW BOOKING RECEIVED\n\n" +
-    `👤 Name: ${booking.clientName}\n` +
-    `📞 Phone: ${booking.clientPhone}\n` +
-    `💇 Style: ${booking.style}\n` +
-    `📏 Length: ${booking.length}\n` +
-    `💰 Price: R${booking.price}\n` +
-    `📅 Date: ${booking.date}\n` +
-    `🕒 Time: ${booking.time}`;
-
-  window.open(
-    `https://wa.me/${adminPhone}?text=${encodeURIComponent(message)}`,
-    "_blank"
-  );
-}
-
-// Send WhatsApp to CLIENT
-function sendWhatsAppToClient(booking, intro = "") {
-    const formattedPhone = formatPhoneForWhatsApp(booking.clientPhone);
-    const message = `
-${intro}
-Hello ${booking.clientName},
-💇 Style: ${booking.style}
-📏 Length: ${booking.length}
-💰 Price: R${booking.price}
-📅 Date: ${booking.date}
-🕒 Time: ${booking.time}
-📌 Status: ${booking.status}
-
-Hair Prep: Wash & dry hair before appointment
-Cancellation: 24h notice required
-    `;
-    window.open(
-        `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`,
-        "_blank"
-    );
-}
-
-function sendWhatsAppBooking(booking, method) {
-  if (method !== "whatsapp") return;
-
-  // Notify admin
-  sendWhatsAppToAdmin(booking);
-
-  // Notify client
-  sendWhatsAppToClient(
-    booking,
-    "✅ Booking received! Your appointment is pending confirmation."
-  );
-}
-
-  function sendSMS(phone, message) {
-fetch("https://us-central1-mumsy-braids-booking.cloudfunctions.net/sendSMS", {
-// Replace with your live server URL in production
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, message })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) console.log("SMS sent!");
-        else console.error("SMS failed:", data.error);
-    })
-    .catch(err => console.error("Error sending SMS:", err));
-}
-
-
-// Send SMS to client
-function sendSmsToClient(booking, messageIntro = "") {
-  // Clean the phone number (keep only digits)
-  const phone = booking.clientPhone.replace(/\D/g, '');
-
-  // Construct the SMS message (plain text only)
-  const message = `${messageIntro}\nHello ${booking.clientName},\nYour booking details:\n` +
-                  `Style: ${booking.style}\n` +
-                  `Length: ${booking.length}\n` +
-                  `Price: R${booking.price}\n` +
-                  `Date: ${booking.date}\n` +
-                  `Time: ${booking.time}\n` +
-                  `Status: ${booking.status}\n` +
-                  `Hair Prep: Wash & dry hair before appointment\n` +
-                  `Cancellation: 24h notice required`;
-
-  // Send request to your server to trigger Twilio SMS
-fetch("https://us-central1-mumsy-braids-booking.cloudfunctions.net/sendSMS", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, message })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      console.log("SMS sent successfully!");
-    } else {
-      console.error("Failed to send SMS:", data.error);
-    }
-  })
-  .catch(err => console.error("Error sending SMS:", err));
-}
-
-      // ----------------- REMINDERS -----------------
-function sendReminderIfDue(booking) {
-    if (!booking.date || !booking.time || booking.reminderSent) return;
-
-    const [hour, minute] = booking.time.split(":").map(Number);
-    const appointmentDate = new Date(booking.date);
-    appointmentDate.setHours(hour, minute, 0, 0);
-
-    const now = new Date();
-    const diffHours = (appointmentDate - now) / (1000 * 60 * 60);
-
-    if (diffHours <= 5 && diffHours > 4 && !booking.reminderSent) {
-        const message = `⏰ Reminder: Hi ${booking.clientName}, your appointment for ${booking.style} (${booking.length}) is in 5 hours at ${booking.time} on ${booking.date}.`;
-
-        if (booking.method === "sms") {
-            sendSmsToClient(booking, message);
-        } else {
-            sendWhatsAppToClient(booking, message);
-        }
-
-        // Optional: add a chat message for admin
-        /*----- db.collection("adminChat").add({
-            message: `Reminder sent to ${booking.clientName} for ${booking.date} ${booking.time}`,
-            timestamp: firebase.firestore.Timestamp.now(),
-            type: "reminder"
-        });
-        
-        // Mark reminder sent in Firestore
-        if (booking.id) {
-            db.collection("bookings").doc(booking.id).update({ reminderSent: true })
-                .then(() => console.log("5-hour reminder sent for", booking.clientName))
-                .catch(err => console.error("Error updating reminder:", err));
-        }   --------*/
-    }
-}
-
-          // ----------------- CLIENT NOTIFICATION (WHATSAPP → SMS FALLBACK) -----------------
-function notifyClientWithFallback(booking, message) {
-  if (booking.method === "whatsapp") {
-    try {
-      sendWhatsAppToClient(booking, message);
-
-      // ⏱️ fallback to SMS after 5 seconds
-      setTimeout(() => {
-        sendSmsToClient(booking, message);
-      }, 5000);
-
-    } catch (err) {
-      // If WhatsApp fails immediately
-      sendSmsToClient(booking, message);
-    }
-  } else {
-    // Client chose SMS
-    sendSmsToClient(booking, message);
-  }
-}
-
-// ----------------- STATUS UPDATE -----------------
-function updateBookingStatus(id, status) {
-  if (!auth.currentUser) {
-    alert("⛔ Admin only");
-    return;
-  }
-
-  db.collection("admins").doc(auth.currentUser.uid).get()
-    .then(doc => {
-      if (!doc.exists || doc.data().role !== "admin") {
-        alert("⛔ Not authorized");
-        throw new Error("Not admin"); // prevent further execution
-      }
-
-      alert("Status update request sent.");
-
-     /*------ return db.collection("bookings").doc(id).get();
-    })
-    .then(doc => {
-      if (!doc.exists) throw new Error("Booking not found");
-      const booking = doc.data();
-      return db.collection("bookings").doc(id).update({ status });
-    })
-    .then(() => {
-      console.log("Booking updated:", id, status);
-     
-      // Send WhatsApp/SMS to client
-      db.collection("bookings").doc(id).get().then(doc => {
-        const booking = doc.data();
-        booking.id = id;
-        booking.status = status;
-notifyClientWithFallback(
-  booking,
-  `✅ Your booking status is now: ${status}!`
-);
-
-      }); -------*/
-    })
-    
-    .catch(err => {
-      console.error("Error updating booking:", err);
-      if (err.message !== "Not admin") alert("❌ Permission denied");
-    });
 }
 
 // Open modal when admin button clicked
