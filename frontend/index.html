@@ -1496,6 +1496,16 @@ function openAdmin() {
           dailyRevenue[dateStr] = dailyRevenue[dateStr] || 0;
         }
 
+async function updateBookingStatus(id, status) {
+  try {
+    const fn = httpsCallable(functions, "updateBookingStatus");
+    await fn({ bookingId: id, status });
+    alert("✅ Status updated");
+  } catch (err) {
+    alert("❌ Failed: " + err.message);
+  }
+}
+        
         // Status class
         const statusClass =
           booking.status === "Pending" ? "pending" :
@@ -1560,63 +1570,25 @@ function openAdmin() {
     });
 }
   
-function markPitched(bookingId, value) {
-  if (!bookingId) return;
-
-  const bookingRef = db.collection("bookings").doc(bookingId);
-
-  bookingRef.update({ pitched: value })
-    .then(() => {
-      console.log(`Booking ${bookingId} marked as: ${value}`);
-
-      // Update the revenue display immediately without waiting for snapshot
-      const card = document.querySelector(`.booking-card button[onclick*="${bookingId}"]`).closest('.booking-card');
-      if (!card) return;
-
-      // Update the pitched text or remove buttons
-      const pitchDiv = card.querySelector('.pitch-buttons');
-      if (pitchDiv) {
-        pitchDiv.outerHTML = `<p>Pitched: ${value}</p>`;
-      }
-
-      // Recalculate daily revenue
-      const dateText = card.querySelector('p:nth-child(4)').textContent.split(' @ ')[0]; // extract booking date
-      const dailySummaryCards = document.querySelectorAll('#dailySummary .style-card');
-
-      dailySummaryCards.forEach(div => {
-        if (div.querySelector('strong').textContent === dateText) {
-          // Get all bookings for this date
-          let totalRevenue = 0;
-          document.querySelectorAll('.booking-card').forEach(bc => {
-            const bDate = bc.querySelector('p:nth-child(4)').textContent.split(' @ ')[0];
-            if (bDate === dateText) {
-              const pitchedText = bc.querySelector('p:nth-child(5)')?.textContent || '';
-              const price = parseFloat(bc.querySelector('p:nth-child(3)')?.textContent.replace(/[^\d]/g,'') || 0);
-              if (pitchedText.includes('yes')) totalRevenue += price;
-            }
-          });
-          div.innerHTML = div.innerHTML.replace(/💰 Revenue: R\d+/, `💰 Revenue: R${totalRevenue}`);
-        }
-      });
-
-    })
-    .catch(err => console.error("Error updating pitched status:", err));
+async function markPitched(id, value) {
+  try {
+    const fn = httpsCallable(functions, "markPitched");
+    await fn({ bookingId: id, value });
+  } catch (err) {
+    console.error(err);
+  }
 }
   
-  function deleteBooking(id) {
-  if (!auth.currentUser) return alert("⛔ Admin only");
+async function deleteBooking(id) {
+  if (!confirm("Delete this booking?")) return;
 
-  if (!confirm("⚠️ Are you sure you want to delete this booking?")) return;
-
-/*----   db.collection("bookings").doc(id).delete()
-    .then(() => {
-      console.log("Booking deleted:", id);
-      alert("Booking deleted successfully!");
-    })
-    .catch(err => {
-      console.error("Error deleting booking:", err);
-      alert("Failed to delete booking.");
-    }); -----*/
+  try {
+    const fn = httpsCallable(functions, "deleteBooking");
+    await fn({ bookingId: id });
+    alert("✅ Booking deleted");
+  } catch (err) {
+    alert("❌ Failed: " + err.message);
+  }
 }
 
   function resetSubmitButtons() {
@@ -1629,39 +1601,17 @@ function markPitched(bookingId, value) {
   });
 }
 
-  document.getElementById("clearAllBtn").onclick = async function() {
-  if (!auth.currentUser) return alert("⛔ Admin only");
-  if (!confirm("⚠️ This will delete ALL bookings. Are you sure?")) return;
+document.getElementById("clearAllBtn").onclick = async function () {
+  if (!confirm("Delete ALL bookings?")) return;
 
   try {
-    const snapshot = await db.collection("bookings").get();
-    const batch = db.batch();
-
-    snapshot.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
-    await batch.commit();
-    alert("✅ All bookings cleared!");
-    console.log("All bookings deleted.");
+    const fn = httpsCallable(functions, "clearAllBookings");
+    await fn();
+    alert("✅ All bookings cleared");
   } catch (err) {
-    console.error("Error clearing bookings:", err);
-    alert("❌ Failed to clear all bookings.");
+    alert("❌ Failed: " + err.message);
   }
 };
-
-
-// Periodically check for reminders every 5 minutes
-setInterval(() => {
-  db.collection("bookings").where("status", "==", "Accepted").get()
-    .then(snapshot => {
-      snapshot.forEach(doc => {
-        const booking = doc.data();
-        booking.id = doc.id;
-        sendReminderIfDue(booking);
-      });
-    });
-}, 5 * 60 * 1000); // every 5 minutes
           
 </script>
 
