@@ -1,3 +1,4 @@
+
 // index.js
 import { onCall } from "firebase-functions/v2/https";
 import { onRequest } from "firebase-functions/v2/https";
@@ -51,54 +52,84 @@ function validateEmail(email) {
 }
 
 // -------------------- CREATE BOOKING --------------------
-export const createBooking = onCall(async (request) => {
-  try {
-    const data = request.data;
+export const createBooking = onCall(
+  { secrets: ["PAYSTACK_SECRET"] },
+  async (request) => {
+    try {
+      const {
+        style,
+        length,
+        clientName,
+        clientPhone,
+        date,
+        time,
+        method,
+        email,
+      } = request.data;
 
-    const {
-      style,
-      length,
-      price,
-      clientName,
-      clientPhone,
-      date,
-      time,
-      method,
-      email,
-    } = data;
+      if (!style || !length || !clientName || !clientPhone || !date || !time || !email) {
+        throw new Error("Missing required fields");
+      }
 
+      // ---------------- PRICE MAP (SERVER CONTROLLED) ----------------
+      const priceMap = {
+        "Box Braids": { Short: 200, Medium: 300, Long: 500 },
+        "Knotless Braids": { Short: 250, Medium: 350, Long: 600 },
+        "CornRows": { Simple: 150 },
+        "Ben & Betty": { Simple: 120 }
+      };
 
-    if (!style || !length || !price || !clientName || !clientPhone || !date || !time || !email) {
-      throw new Error("Missing required fields");
+      const price = priceMap[style]?.[length];
+
+      if (!price) {
+        throw new Error("Invalid style or length");
+      }
+
+      // ---------------- CREATE BOOKING ----------------
+      const bookingRef = await db.collection("bookings").add({
+        style,
+        length,
+        price,
+        clientName,
+        clientPhone: validatePhone(clientPhone),
+        clientEmail: validateEmail(email),
+        date,
+        time,
+        method,
+        status: "Pending",
+        paymentStatus: "Unpaid",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // ---------------- PAYSTACK INIT ----------------
+      const response = await axios.post(
+        "https://api.paystack.co/transaction/initialize",
+        {
+          email,
+          amount: price * 100,
+          metadata: {
+            bookingId: bookingRef.id
+          },
+          callback_url: "https://YOURDOMAIN.com/thank-you.html"
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.PAYSTACK_SECRET}`,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+
+      return {
+        authorization_url: response.data.data.authorization_url
+      };
+
+    } catch (err) {
+      console.error("❌ createBooking error:", err);
+      throw new Error("Unable to start booking");
     }
-
-    const bookingRef = await db.collection("bookings").add({
-      style,
-      length,
-      price,
-      clientName,
-      clientPhone: validatePhone(clientPhone),
-      clientEmail: validateEmail(email),
-      date,
-      time,
-      method,
-      status: "Pending",
-      paymentStatus: "Unpaid",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    const response = await axios.post(
-      "https://api.paystack.co/transaction/initialize",
-      { email, amount: Math.round(price * 100), metadata: { bookingId: bookingRef.id } },
-      { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET}` } }
-    );
-
-    return { authorization_url: response.data.data.authorization_url };
-  } catch (err) {
-    console.error("❌ createBooking failed:", err.message);
-    throw new Error("Could not start payment");
   }
-});
+);
 
 // -------------------- TEST SECRETS --------------------
 export const testSecrets = onCall(() => {
@@ -111,54 +142,72 @@ export const testSecrets = onCall(() => {
 });
 
 // -------------------- PAYSTACK WEBHOOK --------------------
-export const paystackWebhook = onRequest(async (req, res) => {
-  try {
-    if (req.method !== "POST") return res.status(405).send("Method not allowed");
+export const paystackWebhook = onRequest(
+  { secrets: ["PAYSTACK_SECRET"] },
+  async (req, res) => {
+    try {
+      if (req.method !== "POST") {
+        return res.status(405).send("Method not allowed");
+      }
 
-    const signature = req.headers["x-paystack-signature"];
-    const hash = crypto
-      .createHmac("sha512", process.env.PAYSTACK_SECRET)
-      .update(JSON.stringify(req.body))
-      .digest("hex");
+      const hash = crypto
+        .createHmac("sha512", process.env.PAYSTACK_SECRET)
+        .update(req.rawBody)
+        .digest("hex");
 
-    if (hash !== signature) return res.status(400).send("Invalid signature");
+      if (hash !== req.headers["x-paystack-signature"]) {
+        return res.status(400).send("Invalid signature");
+      }
 
-    const event = req.body;
+      const event = req.body;
 
-    if (event.event === "charge.success") {
-      const { metadata, amount } = event.data;
-      const bookingId = metadata?.bookingId;
-      if (!bookingId) return res.status(400).send("Missing bookingId");
+      if (event.event === "charge.success") {
 
-      const bookingRef = db.collection("bookings").doc(bookingId);
+        const bookingId = event.data.metadata?.bookingId;
+        const amount = event.data.amount;
 
-      await db.runTransaction(async (tx) => {
-        const snap = await tx.get(bookingRef);
-        const booking = snap.data();
-        if (!booking) throw new Error("Booking not found");
-        if (booking.paymentStatus === "Paid") return;
+        if (!bookingId) {
+          return res.status(400).send("Missing bookingId");
+        }
 
-        tx.update(bookingRef, {
-          paymentStatus: "Paid",
-          depositPaid: amount / 100,
-          status: "Accepted",
-          receiptEmailSent: false,
+        const bookingRef = db.collection("bookings").doc(bookingId);
+
+        await db.runTransaction(async (tx) => {
+          const snap = await tx.get(bookingRef);
+          if (!snap.exists) throw new Error("Booking not found");
+
+          const booking = snap.data();
+
+          if (booking.paymentStatus === "Paid") {
+            return;
+          }
+
+          tx.update(bookingRef, {
+            paymentStatus: "Paid",
+            depositPaid: amount / 100,
+            status: "Accepted",
+            receiptEmailSent: false
+          });
+
+          const message = `✅ Booking confirmed!
+Hi ${booking.clientName}, your ${booking.style} appointment is confirmed.
+📅 ${booking.date}
+🕒 ${booking.time}`;
+
+          await sendMessage(booking.clientPhone, message, booking.method);
         });
 
-        const message = `✅ Booking confirmed!\nHi ${booking.clientName}, your ${booking.style} (${booking.length}) appointment is confirmed.\n📅 ${booking.date}\n🕒 ${booking.time}`;
-        await sendMessage(booking.clientPhone, message, booking.method);
-      });
+        return res.status(200).send("Webhook processed");
+      }
 
-      console.log(`Booking ${bookingId} verified and confirmed.`);
-      return res.status(200).send("Webhook processed");
+      return res.status(200).send("Event ignored");
+
+    } catch (err) {
+      console.error("Webhook error:", err);
+      return res.status(500).send("Server error");
     }
-
-    return res.status(200).send("Event ignored");
-  } catch (err) {
-    console.error("❌ Webhook error:", err.message);
-    return res.status(500).send("Internal Server Error");
   }
-});
+);
 
 // -------------------- TEST FUNCTION --------------------
 export const testFn = onCall(() => {
