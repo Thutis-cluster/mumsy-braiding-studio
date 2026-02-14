@@ -1,6 +1,6 @@
 // index.js
 import { onCall, onRequest } from "firebase-functions/v2/https";
-import { onSchedule } from "firebase-functions/v2/pubsub";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import admin from "firebase-admin";
 import axios from "axios";
 import twilio from "twilio";
@@ -12,19 +12,35 @@ console.log("🔥 index.js loaded");
 admin.initializeApp();
 const db = admin.firestore();
 
-// -------------------- TWILIO SETUP --------------------
-const TWILIO_SID = process.env.TWILIO_SID;
-const TWILIO_TOKEN = process.env.TWILIO_TOKEN;
-const TWILIO_SMS = process.env.TWILIO_SMS;
-const TWILIO_WHATSAPP = "whatsapp:+14155238886";
-const client = twilio(TWILIO_SID, TWILIO_TOKEN);
-
 // -------------------- HELPERS --------------------
+function getTwilioClient() {
+  const sid = process.env.TWILIO_SID;
+  const token = process.env.TWILIO_TOKEN;
+  if (!sid || !token) {
+    console.warn("Twilio env vars missing, messages will fail");
+    return null;
+  }
+  return twilio(sid, token);
+}
+
 async function sendMessage(phone, message, method = "sms") {
-  if (method === "whatsapp") {
-    await client.messages.create({ body: message, from: TWILIO_WHATSAPP, to: `whatsapp:${phone}` });
-  } else {
-    await client.messages.create({ body: message, from: TWILIO_SMS, to: phone });
+  const client = getTwilioClient();
+  if (!client) {
+    console.warn("Twilio client not configured. Message not sent:", message);
+    return;
+  }
+
+  const TWILIO_SMS = process.env.TWILIO_SMS || "+1234567890";
+  const TWILIO_WHATSAPP = "whatsapp:+14155238886";
+
+  try {
+    if (method === "whatsapp") {
+      await client.messages.create({ body: message, from: TWILIO_WHATSAPP, to: `whatsapp:${phone}` });
+    } else {
+      await client.messages.create({ body: message, from: TWILIO_SMS, to: phone });
+    }
+  } catch (err) {
+    console.error("Twilio sendMessage error:", err.message);
   }
 }
 
@@ -41,48 +57,55 @@ function validateEmail(email) {
   return email;
 }
 
+// -------------------- ADMIN CHECK --------------------
+async function checkAdmin(authContext) {
+  if (!authContext) throw new Error("Not authenticated");
+
+  const adminDoc = await db.collection("admins").doc(authContext.uid).get();
+  if (!adminDoc.exists || adminDoc.data().role !== "admin") {
+    throw new Error("Not authorized");
+  }
+
+  return authContext.uid;
+}
+
 // -------------------- AUDIT LOG --------------------
 async function logAdminAction(adminId, action, details = {}) {
   await db.collection("adminLogs").add({
     adminId,
     action,
     details,
-    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    timestamp: admin.firestore.FieldValue.serverTimestamp()
   });
 }
 
-// -------------------- CREATE BOOKING WITH 45% DEPOSIT --------------------
+// -------------------- CREATE BOOKING --------------------
 export const createBooking = onCall(
-  { secrets: ["PAYSTACK_SECRET"] },
+  { secrets: ["PAYSTACK_SECRET"], timeoutSeconds: 90 },
   async (request) => {
     try {
-      const {
-        style,
-        length,
-        clientName,
-        clientPhone,
-        date,
-        time,
-        method,
-        email,
-      } = request.data;
+      const { style, length, clientName, clientPhone, date, time, method, email } = request.data;
 
+      // Validate required fields
       if (!style || !length || !clientName || !clientPhone || !date || !time || !email) {
-        throw new Error("Missing required fields");
+        console.error("❌ createBooking error: Missing required fields", request.data);
+        throw new Error("Missing required booking fields.");
       }
 
-      // ---------------- PRICE MAP ----------------
+      // Determine price
       const priceMap = {
         "Box Braids": { Short: 200, Medium: 300, Long: 500 },
         "Knotless Braids": { Short: 250, Medium: 350, Long: 600 },
-        "CornRows": { Simple: 150 },
-        "Ben & Betty": { Simple: 120 }
+        "CornRows": { Simple: 50 },
+        "Ben & Betty": { Simple: 20 }
       };
-
       const price = priceMap[style]?.[length];
-      if (!price) throw new Error("Invalid style or length");
+      if (!price) {
+        console.error("❌ createBooking error: Invalid style or length", { style, length });
+        throw new Error("Invalid style or length selected.");
+      }
 
-      // ---------------- DEPOSIT CALCULATION ----------------
+      // Calculate deposit
       const DEPOSIT_PERCENT = 0.45;
       const DEPOSIT_THRESHOLD = 100;
       let depositPaid = 0;
@@ -93,7 +116,7 @@ export const createBooking = onCall(
         balanceRemaining = price - depositPaid;
       }
 
-      // ---------------- CREATE BOOKING ----------------
+      // Create booking in Firestore
       const bookingRef = await db.collection("bookings").add({
         style,
         length,
@@ -107,37 +130,58 @@ export const createBooking = onCall(
         time,
         method,
         status: "Pending",
-        paymentStatus: depositPaid > 0 ? "Deposit Paid" : "No Deposit Required",
+        paymentStatus: depositPaid > 0 ? "Deposit Pending" : "No Deposit Required",
         reminderSent: false,
         deleted: false,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // ---------------- PAYSTACK INIT (deposit) ----------------
+      // If deposit is required, initialize Paystack payment
       if (depositPaid > 0) {
-        const response = await axios.post(
-          "https://api.paystack.co/transaction/initialize",
-          {
-            email,
-            amount: depositPaid * 100,
-            metadata: { bookingId: bookingRef.id },
-            callback_url: "https://YOURDOMAIN.com/thank-you.html"
-          },
-          { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET}`, "Content-Type": "application/json" } }
-        );
+        try {
+          const response = await axios.post(
+            "https://api.paystack.co/transaction/initialize",
+            {
+              email,
+              amount: depositPaid * 100, // Paystack expects kobo
+              metadata: { bookingId: bookingRef.id },
+              callback_url: "https://braiding-bookings.web.app/confirmation"
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${process.env.PAYSTACK_SECRET}`,
+                "Content-Type": "application/json"
+              }
+            }
+          );
 
-        return { authorization_url: response.data.data.authorization_url };
+          // Log full response for debugging
+          console.log("✅ Paystack initialize response:", response.data);
+
+          if (!response.data || !response.data.data || !response.data.data.authorization_url) {
+            console.error("❌ Paystack response missing authorization_url", response.data);
+            throw new Error("Unable to initiate payment with Paystack.");
+          }
+
+          return { authorization_url: response.data.data.authorization_url };
+        } catch (payErr) {
+          console.error("❌ Paystack API error:", payErr.response?.data || payErr.message);
+          throw new Error("Payment initiation failed. Please try again later.");
+        }
       }
 
-      return { bookingId: bookingRef.id }; // no deposit required
+      // No deposit needed, return booking ID
+      return { bookingId: bookingRef.id };
+
     } catch (err) {
-      console.error("❌ createBooking error:", err);
-      throw new Error("Unable to start booking");
+      // Log the full error for debugging
+      console.error("❌ createBooking unexpected error:", err);
+      throw new Error(err.message || "Unable to start booking. Please contact support.");
     }
   }
 );
 
-// -------------------- COMPLETE PAYMENT (ADMIN MARKS BALANCE AS PAID) --------------------
+// -------------------- COMPLETE PAYMENT --------------------
 export const completePayment = onCall(async (request) => {
   const { bookingId, amountPaid, paymentReference } = request.data;
   const adminId = await checkAdmin(request.auth);
@@ -257,8 +301,9 @@ export const softDeleteBooking = onCall(async (request) => {
 });
 
 // -------------------- SCHEDULED REMINDERS WITH DEPOSIT --------------------
-export const sendBookingReminders = onSchedule("every 5 minutes", async () => {
-  const snapshot = await db.collection("bookings")
+export const sendBookingReminders = onSchedule(
+  "every 5 minutes",
+  async (event) => { const snapshot = await db.collection("bookings")
     .where("status", "==", "Accepted")
     .where("reminderSent", "==", false)
     .where("deleted", "==", false)
@@ -301,8 +346,9 @@ export const markPitched = onCall(async (request) => {
 });
 
 // -------------------- DAILY REVENUE --------------------
-export const calculateDailyRevenue = onSchedule("every day 00:10", async () => {
-  const snapshot = await db.collection("bookings").get();
+export const calculateDailyRevenue = onSchedule(
+  "10 0 * * *",
+  async (event) => {const snapshot = await db.collection("bookings").get();
   const dailyTotals = {};
 
   snapshot.forEach(doc => {
@@ -319,27 +365,6 @@ export const calculateDailyRevenue = onSchedule("every day 00:10", async () => {
   }
   await batch.commit();
 });
-
-//-------------------- ADMIN -------------------------
-async function checkAdmin(authContext) {
-  if (!authContext) throw new Error("Not authenticated");
-
-  const adminDoc = await db.collection("admins").doc(authContext.uid).get();
-  if (!adminDoc.exists || adminDoc.data().role !== "admin") {
-    throw new Error("Not authorized");
-  }
-
-  return authContext.uid;
-}
-
-async function logAdminAction(adminId, action, details = {}) {
-  await db.collection("adminLogs").add({
-    adminId,
-    action,
-    details,
-    timestamp: admin.firestore.FieldValue.serverTimestamp()
-  });
-}
 
 // -------------------- TEST FUNCTION --------------------
 export const testFn = onCall(() => {
