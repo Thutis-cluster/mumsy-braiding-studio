@@ -3,12 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mumsy Braids Studio Booking</title>
-
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
 
 <!---- Paystack SDKs ------>
@@ -660,7 +654,7 @@ input:focus, select:focus {
   </div>
 
  <div class="style-card">
-    <img src="images/benny-betty-20.jpg" alt="Ben & Betty</">
+    <img src="images/benny-betty-20.jpg" alt="Ben & Betty">
     <p><strong>Ben & Betty</strong></p>
     <button class="button" onclick="selectStyle('Ben & Betty')">Select</button>
   </div>
@@ -733,11 +727,11 @@ input:focus, select:focus {
 
 
   <button class="button" onclick="showScreen('date',4)">Back</button>
-<button class="button submit-btn" onclick="handleBooking('sms')">
+<button class="button submit-btn" id="button submit-btn" onclick="handleBooking('sms')">
   ✅ Confirm Booking (SMS)
 </button>
 
-<button class="button submit-btn" onclick="handleBooking('whatsapp')">
+<button class="button submit-btn" id="button submit-btn" onclick="handleBooking('whatsapp')">
   📱 Send Booking on WhatsApp
 </button>
 
@@ -795,32 +789,44 @@ input:focus, select:focus {
 <div id="reminderLogs"></div>
 </div>
 
-<script>
+<script type="module">
   // ----------------- FIREBASE -----------------
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
-const functions = getFunctions();
 
-  console.log("🔥 THIS IS THE SCRIPT RUNNING");
+document.addEventListener("DOMContentLoaded", () => {
 
+  console.log("🔥 Script Loaded Properly");
+
+  // ---------------- FIREBASE INIT ----------------
 const firebaseConfig = {
-  apiKey: "AIzaSyDYzO6pW5fjL6OhKrtELohjpzev8znveys",
-  authDomain: "mumsy-braids-booking.firebaseapp.com",
-  projectId: "mumsy-braids-booking",
-  storageBucket: "mumsy-braids-booking.firebasestorage.app",
-  messagingSenderId: "494103742106",
-  appId: "1:494103742106:web:9b8f7cfd4430d045bec123",
-  measurementId: "G-090W6YHJ09"
+  apiKey: "AIzaSyCcChD_9sMvxncp7hulcwhKlUyJ87BR7zs",
+  authDomain: "braiding-bookings.firebaseapp.com",
+  projectId: "braiding-bookings",
+  storageBucket: "braiding-bookings.firebasestorage.app",
+  messagingSenderId: "243406972406",
+  appId: "1:243406972406:web:2ab34ed5ab3491af5553d7",
+  measurementId: "G-4XLV27JNW8"
 };
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-console.log("Firebase connected:", firebase.apps.length > 0);
-const auth = firebase.auth();
 
-  console.log("🔥 Firebase initialized");
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+  const functions = getFunctions(app);
+
+  const createBooking = httpsCallable(functions, "createBooking");
+  const updateBookingStatusFn = httpsCallable(functions, "updateBookingStatus");
+  const deleteBookingFn = httpsCallable(functions, "deleteBooking");
+  const markPitchedFn = httpsCallable(functions, "markPitched");
+
+  console.log("🔥 Firebase Initialized Correctly");
   
 // ----------------- VARIABLES -----------------
 let selectedStyle = "";
 let selectedLength = "";
+let selectedDate = "";
 let selectedPrice = 0;
 let selectedTimeEstimate = "";
 let ADMIN_CLOSED_DAYS = {};
@@ -1009,7 +1015,10 @@ function selectLength(length) {
   const dateInput = document.getElementById("clientDate");
   const selectedDate = dateInput.value;
 
-  if (!selectedDate) return;
+  if (!selectedDate)  {
+    alert("Please select a date.");
+    return;
+  }
 
   // Fetch bookings for selected date
   db.collection("bookings")
@@ -1198,6 +1207,7 @@ function getFamilyDay(year) {
 
       div.classList.add("selected");
       document.getElementById("clientDate").value = dateStr;
+  selectedDate = dateStr; 
       validateClientForm();
     };
 
@@ -1205,20 +1215,28 @@ function getFamilyDay(year) {
   }
 }
 
-function loadAdminClosedDays(year) {
-  ADMIN_CLOSED_DAYS = {};
+async function loadAdminClosedDays(year) {
+  ADMIN_CLOSED_DAYS = {}; // Reset the object
+  
+  // Accessing the Firestore collection using modular syntax
+  const closedDaysRef = collection(db, "closedDays");
+  const q = query(closedDaysRef, 
+    where("date", ">=", `${year}-01-01`),
+    where("date", "<=", `${year}-12-31`)
+  );
 
-  db.collection("closedDays")
-    .where("date", ">=", `${year}-01-01`)
-    .where("date", "<=", `${year}-12-31`)
-    .get()
-    .then(snapshot => {
-      snapshot.forEach(doc => {
-        const d = doc.data();
-        ADMIN_CLOSED_DAYS[d.date] = d.reason || "Closed";
-      });
-      renderCalendar(currentYear, currentMonth);
+  try {
+    const snapshot = await getDocs(q); // Get all the documents in the query result
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      ADMIN_CLOSED_DAYS[data.date] = data.reason || "Closed"; // Store the reason
     });
+
+    // After loading, re-render the calendar (assuming `renderCalendar` is already defined)
+    renderCalendar(currentYear, currentMonth);
+  } catch (err) {
+    console.error("Error loading admin closed days:", err);
+  }
 }
 
 // ----------------- DISPLAY CONFIRMATION -----------------
@@ -1269,38 +1287,52 @@ function validateClientForm() {
   });
 }
 
-/* ----------------- FORM SUBMIT (Cloud Function) ----------------- */
-document.getElementById("bookingForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
+async function handleBooking(method) {
+    if (!selectedStyle || !selectedLength || !selectedPrice || !selectedTimeEstimate || !selectedDate) {
+        alert("Please complete all fields before proceeding.");
+        return;
+    }
 
-  const payBtn = document.getElementById("payBtn");
+    const clientName = document.getElementById("clientName").value.trim();
+    const clientPhone = document.getElementById("clientPhone").value.trim();
+    const clientEmail = document.getElementById("clientEmail").value.trim();
 
-  try {
-    payBtn.disabled = true;
-    payBtn.innerText = "Processing...";
-
-    const data = {
-      style: document.getElementById("style").value,
-      length: document.getElementById("length").value,
-      clientName: document.getElementById("name").value,
-      clientPhone: document.getElementById("phone").value,
-      date: document.getElementById("date").value,
-      time: document.getElementById("time").value,
-      method: document.getElementById("method").value,
-      email: document.getElementById("email").value,
+    const bookingData = { 
+        style: selectedStyle,
+        length: selectedLength,
+        clientName,
+        clientPhone,
+        email: clientEmail,
+        date: selectedDate,
+        time: selectedTimeEstimate,
+        method
     };
 
-    const response = await createBooking(data);
+    const bookingBtn = document.querySelector(".submit-btn");
+    bookingBtn.disabled = true;
+    bookingBtn.innerText = "Processing...";
 
-    // Redirect to Paystack (secure server-side created link)
-    window.location.href = response.data.authorization_url;
+    try {
+        const response = await createBooking(bookingData);
 
-  } catch (error) {
-    alert("Booking failed. Please try again.");
-    payBtn.disabled = false;
-    payBtn.innerText = "Book Now";
-  }
-});
+        const { authorization_url, bookingId } = response.data;
+
+        if (authorization_url) {
+            window.location.href = authorization_url;
+        } else if (bookingId) {
+            alert("Booking created successfully.");
+        } else {
+            alert("Unexpected server response.");
+        }
+
+    } catch (err) {
+        console.error("Booking error:", err);
+        alert(err.message || "Payment initialization failed.");
+    } finally {
+        bookingBtn.disabled = false;
+        bookingBtn.innerText = "Confirm Booking";
+    }
+}
   
 function getMinutesFromEstimate(estimate) {
   // Example: "3 – 4 hours" → take MAX value
@@ -1361,30 +1393,35 @@ function adminLogin() {
 
   errorEl.textContent = "";
 
-  auth.signInWithEmailAndPassword(email, password)
-    .then(({ user }) => db.collection("admins").doc(user.uid).get())
+  // Sign in with Firebase Email/Password
+  signInWithEmailAndPassword(auth, email, password)
+    .then(({ user }) => {
+      // Once the user is logged in, fetch the admin document from Firestore
+      return db.collection("admins").doc(user.uid).get();
+    })
     .then(doc => {
       if (!doc.exists || doc.data().role !== "admin") {
         alert("⛔ Not authorized as admin");
-        auth.signOut();
+        auth.signOut();  // Sign out if not an admin
         return;
       }
 
-      // ✅ Successful login
+      // Admin successfully logged in, proceed to show the admin panel
       document.getElementById("adminBtn").style.display = "block";
-      hideAdminModal();   // <-- hide modal
+      hideAdminModal();  // Hide the login modal
       showScreen("admin", 5);
-      openAdmin();
+      openAdmin();  // Open the admin panel
     })
-.catch(err => {
-  errorEl.textContent = "❌ Login failed: " + err.message;
+    .catch(err => {
+      // If login fails, show the error message
+      errorEl.textContent = "❌ Login failed: " + err.message;
 
-  // Shake modal on error
-  const modalBox = document.querySelector(".modal-content");
-  modalBox.classList.remove("shake"); // reset
-  void modalBox.offsetWidth;          // force reflow
-  modalBox.classList.add("shake");
-});
+      // Shake modal on error
+      const modalBox = document.querySelector(".modal-content");
+      modalBox.classList.remove("shake"); // reset
+      void modalBox.offsetWidth;  // force reflow
+      modalBox.classList.add("shake");
+    });
 }
 
 function forgotAdminPassword() {
@@ -1457,7 +1494,7 @@ function adminLogout() {
 }
 
 // ----------------- ADMIN PANEL -----------------
-function openAdmin() {
+async function openAdmin() {
   if (!auth.currentUser) {
     alert("⛔ Access denied. Admins only.");
     showScreen("home", 1);
@@ -1468,106 +1505,95 @@ function openAdmin() {
   const list = document.getElementById("bookingsList");
   const summary = document.getElementById("dailySummary");
 
-  db.collection("bookings")
-    .orderBy("createdAt", "desc")
-    .onSnapshot(snapshot => {
-      list.innerHTML = "";
-      summary.innerHTML = "";
+  // Listening for changes to the "bookings" collection
+  const bookingsRef = collection(db, "bookings");
+  const q = query(bookingsRef, orderBy("createdAt", "desc"));
 
-      const dailyTotals = {};
-      const dailyRevenue = {};
-      const today = new Date();
-      today.setHours(0,0,0,0); // normalize to start of day
+  onSnapshot(q, snapshot => {
+    list.innerHTML = ""; // Clear the current list
+    summary.innerHTML = ""; // Clear the summary
 
-      snapshot.forEach(doc => {
-        const booking = doc.data() || {};
-        const id = doc.id;
-        const dateStr = booking.date || "Unknown";
-        const bookingDate = booking.date ? new Date(booking.date) : today;
-        bookingDate.setHours(0,0,0,0); // normalize
+    const dailyTotals = {};
+    const dailyRevenue = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today to midnight
 
-        const hours = estimateToHours(booking.timeEstimate || "0");
-        dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + hours;
+    snapshot.docs.forEach(doc => {
+      const booking = doc.data();
+      const id = doc.id;
+      const dateStr = booking.date || "Unknown";
+      const bookingDate = booking.date ? new Date(booking.date) : today;
+      bookingDate.setHours(0, 0, 0, 0); // Normalize the date
 
-        // Revenue only if pitched
-        if (booking.pitched === "yes") {
-          dailyRevenue[dateStr] = (dailyRevenue[dateStr] || 0) + (booking.price || 0);
-        } else {
-          dailyRevenue[dateStr] = dailyRevenue[dateStr] || 0;
-        }
+      const hours = estimateToHours(booking.timeEstimate || "0");
+      dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + hours;
 
-async function updateBookingStatus(id, status) {
-  try {
-    const fn = httpsCallable(functions, "updateBookingStatus");
-    await fn({ bookingId: id, status });
-    alert("✅ Status updated");
-  } catch (err) {
-    alert("❌ Failed: " + err.message);
-  }
-}
-        
-        // Status class
-        const statusClass =
-          booking.status === "Pending" ? "pending" :
-          booking.status === "Accepted" ? "accepted" :
-          booking.status === "Declined" ? "declined" : "pending";
-
-        // Pitch buttons logic
-        let pitchHTML = "";
-        if (bookingDate <= today) {
-          if (!booking.pitched || booking.pitched === "pending") {
-            pitchHTML = `
-              <div class="pitch-buttons">
-                <button class="button pitch" onclick="markPitched('${id}', 'yes')">Pitched</button>
-                <button class="button nopitch" onclick="markPitched('${id}', 'no')">Didn't Pitch</button>
-              </div>
-            `;
-          } else {
-            pitchHTML = `<p>Pitched: ${booking.pitched}</p>`;
-          }
-        } else {
-          pitchHTML = `<p>Pitched: Pending</p>`;
-        }
-
-        // Booking card
-        const card = document.createElement("div");
-        card.className = `booking-card ${statusClass}`;
-        card.innerHTML = `
-          <p><strong>${booking.clientName || "Unknown Client"}</strong></p>
-          <p>${booking.style || "Unknown Style"} – ${booking.length || "Unknown Length"}</p>
-          <p>⏱ ${booking.timeEstimate || "0 hrs"}</p>
-          <p>${dateStr} @ ${booking.time || "Unknown Time"}</p>
-          <p>Status: ${booking.status || "Pending"}</p>
-
-          <div class="booking-buttons">
-            <div class="status-buttons">
-              <button class="button accept" onclick="updateBookingStatus('${id}','Accepted')">Accept</button>
-              <button class="button decline" onclick="updateBookingStatus('${id}','Declined')">Decline</button>
-            </div>
-
-            ${pitchHTML}
-
-            <div class="delete-button">
-              <button class="button delete" onclick="deleteBooking('${id}')">Delete</button>
-            </div>
-          </div>
-        `;
-        list.appendChild(card);
-      });
-
-      // Daily summary
-      for (const date in dailyTotals) {
-        const div = document.createElement("div");
-        div.className = "style-card";
-        div.innerHTML = `
-          <strong>${date}</strong><br>
-          ⏱ Work: ${dailyTotals[date]} hrs<br>
-          💰 Revenue: R${dailyRevenue[date]}<br>
-          <button class="button clear" onclick="clearBookingsForDate('${date}')">Clear</button>
-        `;
-        summary.appendChild(div);
+      // Calculate revenue only for pitched bookings
+      if (booking.pitched === "yes") {
+        dailyRevenue[dateStr] = (dailyRevenue[dateStr] || 0) + (booking.price || 0);
+      } else {
+        dailyRevenue[dateStr] = dailyRevenue[dateStr] || 0;
       }
+
+      // Determine booking status class
+      const statusClass = 
+        booking.status === "Pending" ? "pending" :
+        booking.status === "Accepted" ? "accepted" :
+        booking.status === "Declined" ? "declined" : "pending";
+
+      // Render booking card with pitch options
+      let pitchHTML = "";
+      if (bookingDate <= today) {
+        if (!booking.pitched || booking.pitched === "pending") {
+          pitchHTML = `
+            <div class="pitch-buttons">
+              <button class="button pitch" onclick="markPitched('${id}', 'yes')">Pitched</button>
+              <button class="button nopitch" onclick="markPitched('${id}', 'no')">Didn't Pitch</button>
+            </div>
+          `;
+        } else {
+          pitchHTML = `<p>Pitched: ${booking.pitched}</p>`;
+        }
+      } else {
+        pitchHTML = `<p>Pitched: Pending</p>`;
+      }
+
+      // Create the booking card
+      const card = document.createElement("div");
+      card.className = `booking-card ${statusClass}`;
+      card.innerHTML = `
+        <p><strong>${booking.clientName || "Unknown Client"}</strong></p>
+        <p>${booking.style || "Unknown Style"} – ${booking.length || "Unknown Length"}</p>
+        <p>⏱ ${booking.timeEstimate || "0 hrs"}</p>
+        <p>${dateStr} @ ${booking.time || "Unknown Time"}</p>
+        <p>Status: ${booking.status || "Pending"}</p>
+        <div class="booking-buttons">
+          <div class="status-buttons">
+            <button class="button accept" onclick="updateBookingStatus('${id}','Accepted')">Accept</button>
+            <button class="button decline" onclick="updateBookingStatus('${id}','Declined')">Decline</button>
+          </div>
+          ${pitchHTML}
+          <div class="delete-button">
+            <button class="button delete" onclick="deleteBooking('${id}')">Delete</button>
+          </div>
+        </div>
+      `;
+      list.appendChild(card);
     });
+
+    // Render daily summary
+    for (const date in dailyTotals) {
+      const div = document.createElement("div");
+      div.className = "style-card";
+      div.innerHTML = `
+        <strong>${date}</strong><br>
+        ⏱ Work: ${dailyTotals[date]} hrs<br>
+        💰 Revenue: R${dailyRevenue[date]}<br>
+        <button class="button clear" onclick="clearBookingsForDate('${date}')">Clear</button>
+      `;
+      summary.appendChild(div);
+    }
+  });
 }
   
 async function markPitched(id, value) {
@@ -1576,6 +1602,16 @@ async function markPitched(id, value) {
     await fn({ bookingId: id, value });
   } catch (err) {
     console.error(err);
+  }
+}
+
+async function updateBookingStatus(id, status) {
+  try {
+    const fn = httpsCallable(functions, "updateBookingStatus");
+    await fn({ bookingId: id, status });
+    alert("✅ Status updated");
+  } catch (err) {
+    alert("❌ Failed: " + err.message);
   }
 }
   
@@ -1589,6 +1625,30 @@ async function deleteBooking(id) {
   } catch (err) {
     alert("❌ Failed: " + err.message);
   }
+}
+
+function clearBookingsForDate(date) {
+  if (!confirm(`Are you sure you want to clear all bookings for ${date}?`)) return;
+
+  const bookingsRef = collection(db, "bookings");
+  const q = query(bookingsRef, where("date", "==", date));
+
+  getDocs(q)
+    .then(snapshot => {
+      const batch = writeBatch(db);
+      snapshot.forEach(doc => {
+        batch.delete(doc.ref); // Delete each document in the snapshot
+      });
+
+      return batch.commit(); // Commit the batch operation
+    })
+    .then(() => {
+      alert(`✅ All bookings for ${date} have been cleared`);
+    })
+    .catch(err => {
+      console.error("Error clearing bookings:", err);
+      alert("❌ Failed to clear bookings");
+    });
 }
 
   function resetSubmitButtons() {
@@ -1612,6 +1672,25 @@ document.getElementById("clearAllBtn").onclick = async function () {
     alert("❌ Failed: " + err.message);
   }
 };
+
+// 🔥 Expose functions to HTML (because we use type="module")
+window.showScreen = showScreen;
+window.selectStyle = selectStyle;
+window.selectLength = selectLength;
+window.changeMonth = changeMonth;
+window.validateClientForm = validateClientForm;
+window.handleBooking = handleBooking;
+window.closeAdminLogin = hideAdminModal;
+window.toggleAdminPassword = toggleAdminPassword;
+window.adminLogin = adminLogin;
+window.forgotAdminPassword = forgotAdminPassword;
+window.adminLogout = adminLogout;
+window.markPitched = markPitched;
+window.updateBookingStatus = updateBookingStatus;
+window.deleteBooking = deleteBooking;
+window.clearBookingsForDate = clearBookingsForDate;
+
+});
           
 </script>
 
