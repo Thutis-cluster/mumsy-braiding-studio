@@ -1,5 +1,5 @@
 // index.js
-import { onCall, onRequest } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import admin from "firebase-admin";
 import axios from "axios";
@@ -58,15 +58,18 @@ function validateEmail(email) {
 }
 
 // -------------------- ADMIN CHECK --------------------
-async function checkAdmin(authContext) {
-  if (!authContext) throw new Error("Not authenticated");
-
-  const adminDoc = await db.collection("admins").doc(authContext.uid).get();
-  if (!adminDoc.exists || adminDoc.data().role !== "admin") {
-    throw new Error("Not authorized");
+async function checkAdmin(auth) {
+  if (!auth) {
+    throw new HttpsError("unauthenticated", "Login required.");
   }
 
-  return authContext.uid;
+  const adminDoc = await db.collection("admins").doc(auth.uid).get();
+
+  if (!adminDoc.exists || adminDoc.data().role !== "admin") {
+    throw new HttpsError("permission-denied", "Admin access required.");
+  }
+
+  return auth.uid;
 }
 
 // -------------------- AUDIT LOG --------------------
@@ -81,7 +84,7 @@ async function logAdminAction(adminId, action, details = {}) {
 
 // -------------------- CREATE BOOKING --------------------
 export const createBooking = onCall(
-  { secrets: ["PAYSTACK_SECRET"], timeoutSeconds: 90 },
+  { secrets: ["PAYSTACK_SECRET"], timeoutSeconds: 120 },
   async (request) => {
     try {
       const { style, length, clientName, clientPhone, date, time, method, email } = request.data;
@@ -218,11 +221,13 @@ export const completePayment = onCall(async (request) => {
 });
 
 // -------------------- PAYSTACK WEBHOOK --------------------
-export const paystackWebhook = onRequest({ secrets: ["PAYSTACK_SECRET"] }, async (req, res) => {
+export const paystackWebhook = onRequest({ secrets: ["PAYSTACK_SECRET"],
+    cors: false }, async (req, res) => {
   try {
     if (req.method !== "POST") return res.status(405).send("Method not allowed");
 
-    const hash = crypto.createHmac("sha512", process.env.PAYSTACK_SECRET).update(req.rawBody).digest("hex");
+    const hash = crypto.createHmac("sha512", process.env.PAYSTACK_SECRET).update(Buffer.from(JSON.stringify(req.body)))
+.digest("hex");
     if (hash !== req.headers["x-paystack-signature"]) return res.status(400).send("Invalid signature");
 
     const event = req.body;
@@ -250,6 +255,51 @@ export const paystackWebhook = onRequest({ secrets: ["PAYSTACK_SECRET"] }, async
   } catch (err) {
     console.error("Webhook error:", err);
     return res.status(500).send("Server error");
+  }
+});
+
+// -------------------- ADMIN LOGIN--------------------
+export const verifyAdmin = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Not logged in.");
+  }
+
+  const adminDoc = await db.collection("admins").doc(request.auth.uid).get();
+
+  if (!adminDoc.exists || adminDoc.data().role !== "admin") {
+    throw new HttpsError("permission-denied", "Not authorized as admin.");
+  }
+
+  return { success: true };
+});
+
+// -------------------- FORGOT ADMIN PASSWORD --------------------
+export const forgotAdminPassword = onCall(async (request) => {
+  const { email } = request.data;
+
+  if (!email) {
+    throw new HttpsError("invalid-argument", "Email is required.");
+  }
+
+  try {
+    // Check if email exists in admins collection
+    const q = await db.collection("admins").where("email", "==", email).get();
+
+    if (q.empty) {
+      // Always respond the same way to avoid leaking which emails are admins
+      return { success: true, message: "If this email is registered as an admin, a reset email has been sent." };
+    }
+
+    // Generate password reset link via Firebase Admin SDK
+    const link = await admin.auth().generatePasswordResetLink(email);
+
+    // Optionally, you can send it via your email provider here
+    console.log("✅ Generated admin password reset link:", link);
+
+    return { success: true, message: "If this email is registered as an admin, a reset email has been sent." };
+  } catch (err) {
+    console.error("❌ forgotAdminPassword error:", err);
+    throw new HttpsError("internal", "Failed to send reset email.");
   }
 });
 
@@ -301,9 +351,7 @@ export const softDeleteBooking = onCall(async (request) => {
 });
 
 // -------------------- SCHEDULED REMINDERS WITH DEPOSIT --------------------
-export const sendBookingReminders = onSchedule(
-  "every 5 minutes",
-  async (event) => { const snapshot = await db.collection("bookings")
+export const sendBookingReminders = onSchedule("*/5 * * * *", async (event) => { const snapshot = await db.collection("bookings")
     .where("status", "==", "Accepted")
     .where("reminderSent", "==", false)
     .where("deleted", "==", false)
