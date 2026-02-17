@@ -792,11 +792,11 @@ input:focus, select:focus {
 <script type="module">
   // ----------------- FIREBASE -----------------
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, doc, getDoc,  writeBatch} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, setPersistence, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
 
   console.log("🔥 Script Loaded Properly");
 
@@ -814,7 +814,9 @@ const firebaseConfig = {
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   const auth = getAuth(app);
-  const functions = getFunctions(app);
+  window.auth = auth;
+  await setPersistence(auth, inMemoryPersistence);
+  const functions = getFunctions(app, "us-central1");
 
   const createBooking = httpsCallable(functions, "createBooking");
   const updateBookingStatusFn = httpsCallable(functions, "updateBookingStatus");
@@ -1386,95 +1388,89 @@ function onAdminLoginSuccess() {
   openAdmin();       // open admin panel
 }
 
-function adminLogin() {
-  const email = document.getElementById("adminEmail").value.trim();
-  const password = document.getElementById("adminPassword").value.trim();
+async function adminLogin() {
+  const email = document.getElementById("adminEmail").value;
+  const password = document.getElementById("adminPassword").value;
   const errorEl = document.getElementById("adminLoginError");
 
-  errorEl.textContent = "";
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
 
-  // Sign in with Firebase Email/Password
-  signInWithEmailAndPassword(auth, email, password)
-    .then(({ user }) => {
-      // Once the user is logged in, fetch the admin document from Firestore
-      return db.collection("admins").doc(user.uid).get();
-    })
-    .then(doc => {
-      if (!doc.exists || doc.data().role !== "admin") {
-        alert("⛔ Not authorized as admin");
-        auth.signOut();  // Sign out if not an admin
-        return;
-      }
+    if (!user) throw new Error("Login failed. User not found.");
 
-      // Admin successfully logged in, proceed to show the admin panel
-      document.getElementById("adminBtn").style.display = "block";
-      hideAdminModal();  // Hide the login modal
-      showScreen("admin", 5);
-      openAdmin();  // Open the admin panel
-    })
-    .catch(err => {
-      // If login fails, show the error message
-      errorEl.textContent = "❌ Login failed: " + err.message;
+    // refresh token
+    await user.getIdToken(true);
+    const tokenResult = await user.getIdTokenResult();
 
-      // Shake modal on error
-      const modalBox = document.querySelector(".modal-content");
-      modalBox.classList.remove("shake"); // reset
-      void modalBox.offsetWidth;  // force reflow
-      modalBox.classList.add("shake");
-    });
+    if (!tokenResult.claims.admin) throw new Error("Not authorized as admin.");
+
+    // ✅ Flag this session as freshly logged in
+    sessionStorage.setItem("adminJustLoggedIn", "true");
+
+    hideAdminModal();
+    openAdmin(); // Only open admin now
+  } catch (err) {
+    console.error("LOGIN ERROR:", err);
+    errorEl.textContent = "❌ Login failed: " + err.message;
+  }
 }
 
-function forgotAdminPassword() {
+// Forgot Password function
+async function forgotAdminPassword() {
   const email = document.getElementById("adminEmail").value.trim();
+  const errorEl = document.getElementById("adminLoginError");
+  errorEl.textContent = "";
 
   if (!email) {
-    alert("⚠️ Please enter your admin email first.");
+    errorEl.textContent = "❌ Please enter your admin email.";
     return;
   }
 
-  auth.sendPasswordResetEmail(email)
-    .then(() => {
-      alert("✅ Password reset email sent. Check your inbox or spam folder.");
-    })
-    .catch(err => {
-      console.error("Password reset error:", err);
+  try {
+    const forgotFn = httpsCallable(functions, "forgotAdminPassword");
+    const result = await forgotFn({ email });
 
-      let message = "❌ Failed to send reset email.";
-      if (err.code === "auth/user-not-found") {
-        message = "❌ No admin account found with this email.";
-      }
-
-      alert(message);
-    });
+    alert(result.data.message); // e.g., "If this email is registered as an admin, a reset email has been sent."
+  } catch (err) {
+    console.error("Forgot password error:", err);
+    errorEl.textContent = "❌ " + (err.message || "Failed to send reset email");
+  }
 }
 
-auth.onAuthStateChanged(user => {
+// Keep only one onAuthStateChanged listener
+auth.onAuthStateChanged(async (user) => {
   const adminBtn = document.getElementById("adminBtn");
 
   if (!user) {
+    // No user, show home
     adminBtn.style.display = "block";
     return;
   }
 
-  // 🔒 Verify admin role
-  db.collection("admins").doc(user.uid).get()
-    .then(doc => {
-      if (doc.exists && doc.data().role === "admin") {
-        adminBtn.style.display = "block";
-      } else {
-        adminBtn.style.display = "block";
-        auth.signOut();
-        showScreen("home", 1);
-      }
-    })
-    .catch(() => {
-      adminBtn.style.display = "block";
-      auth.signOut();
+  try {
+    const token = await user.getIdTokenResult();
+
+    if (!token.claims.admin) {
+      await signOut(auth);
       showScreen("home", 1);
-    });
+      return;
+    }
+
+    // Only go to admin if user just logged in
+    if (sessionStorage.getItem("adminJustLoggedIn")) {
+      openAdmin();
+      sessionStorage.removeItem("adminJustLoggedIn");
+    }
+
+    adminBtn.style.display = "block";
+  } catch (err) {
+    console.error("Token error:", err);
+    showScreen("home", 1);
+  }
 });
 
-  function toggleAdminPassword() {
+ function toggleAdminPassword() {
   const passwordInput = document.getElementById("adminPassword");
   const icon = document.querySelector(".toggle-password");
 
@@ -1495,12 +1491,6 @@ function adminLogout() {
 
 // ----------------- ADMIN PANEL -----------------
 async function openAdmin() {
-  if (!auth.currentUser) {
-    alert("⛔ Access denied. Admins only.");
-    showScreen("home", 1);
-    return;
-  }
-
   showScreen("admin", 5);
   const list = document.getElementById("bookingsList");
   const summary = document.getElementById("dailySummary");
