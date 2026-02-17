@@ -1393,26 +1393,28 @@ async function adminLogin() {
   const password = document.getElementById("adminPassword").value;
   const errorEl = document.getElementById("adminLoginError");
 
+  errorEl.textContent = "";
+
   try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
+    // 1️⃣ Sign in
+    await signInWithEmailAndPassword(auth, email, password);
 
-    if (!user) throw new Error("Login failed. User not found.");
+    // 2️⃣ Verify admin via backend
+    const verifyFn = httpsCallable(functions, "verifyAdmin");
+    await verifyFn();
 
-    // refresh token
-    await user.getIdToken(true);
-    const tokenResult = await user.getIdTokenResult();
-
-    if (!tokenResult.claims.admin) throw new Error("Not authorized as admin.");
-
-    // ✅ Flag this session as freshly logged in
+    // 3️⃣ Mark this as a fresh login
     sessionStorage.setItem("adminJustLoggedIn", "true");
 
     hideAdminModal();
-    openAdmin(); // Only open admin now
+    openAdmin();
+
   } catch (err) {
     console.error("LOGIN ERROR:", err);
     errorEl.textContent = "❌ Login failed: " + err.message;
+
+    // Safety: sign out if partially logged in
+    await signOut(auth);
   }
 }
 
@@ -1443,29 +1445,24 @@ auth.onAuthStateChanged(async (user) => {
   const adminBtn = document.getElementById("adminBtn");
 
   if (!user) {
-    // No user, show home
-    adminBtn.style.display = "block";
+    showScreen("home", 1);
     return;
   }
 
   try {
-    const token = await user.getIdTokenResult();
+    // Verify admin via backend
+    const verifyFn = httpsCallable(functions, "verifyAdmin");
+    await verifyFn();
 
-    if (!token.claims.admin) {
-      await signOut(auth);
-      showScreen("home", 1);
-      return;
-    }
-
-    // Only go to admin if user just logged in
+    // Only open admin if freshly logged in
     if (sessionStorage.getItem("adminJustLoggedIn")) {
       openAdmin();
       sessionStorage.removeItem("adminJustLoggedIn");
     }
 
-    adminBtn.style.display = "block";
   } catch (err) {
-    console.error("Token error:", err);
+    // Not an admin → force logout
+    await signOut(auth);
     showScreen("home", 1);
   }
 });
@@ -1491,6 +1488,11 @@ function adminLogout() {
 
 // ----------------- ADMIN PANEL -----------------
 async function openAdmin() {
+  if (!auth.currentUser) {
+    showScreen("home", 1);
+    return;
+  }
+
   showScreen("admin", 5);
   const list = document.getElementById("bookingsList");
   const summary = document.getElementById("dailySummary");
