@@ -84,7 +84,7 @@ async function logAdminAction(adminId, action, details = {}) {
 
 // -------------------- CREATE BOOKING --------------------
 export const createBooking = onCall(
-  { secrets: ["PAYSTACK_SECRET"], timeoutSeconds: 120 },
+  { secrets: ["PAYSTACK_SECRET"], timeoutSeconds: 150 },
   async (request) => {
     try {
       const { style, length, clientName, clientPhone, date, time, method, email } = request.data;
@@ -148,7 +148,7 @@ export const createBooking = onCall(
               email,
               amount: depositPaid * 100, // Paystack expects kobo
               metadata: { bookingId: bookingRef.id },
-              callback_url: "https://braiding-bookings.web.app/confirmation"
+            callback_url: `https://braiding-bookings.web.app/confirmation?bookingId=${bookingRef.id}`
             },
             {
               headers: {
