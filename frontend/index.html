@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -15,13 +15,17 @@
     emailjs.init("eKm4zBdlsO7x8avnv");
   })();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
 
 <style>
 body {
   font-family: 'Poppins', sans-serif;
-  background: linear-gradient(180deg, #fdf6f0, #fffaf6);
+  background: radial-gradient(circle at 20% 20%, #fff6ef 0%, #fdf1e8 35%, #f6e6dc 70%, #f3e0d4 100%);
   color: #4b3f36;
+  min-height: 100vh;
 }
+
 
 .progress-container {
   display: flex;
@@ -33,30 +37,51 @@ body {
 .progress-step {
   flex: 1;
   height: 6px;
-  background: #eaded6;
-  border-radius: 6px;
-  overflow: hidden;
+  background: #e7d6cb;
+  border-radius: 10px;
+  transition: all 0.3s ease;
 }
 
 .progress-step.active {
   background: linear-gradient(90deg, #f5b7a3, #e59a84);
+  box-shadow:
+    0 0 12px rgba(245,183,163,0.7),
+    0 0 25px rgba(245,183,163,0.4);
+  transition: all 0.4s ease;
 }
 
+/* Smooth fade between screens */
 .screen {
   display: none;
   padding: 28px 20px;
   max-width: 420px;
   margin: auto;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
 }
 
 .screen.active {
   display: block;
-  animation: fadeUp 0.5s ease;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(15px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Micro-bounce Interaction */
+@keyframes microBounce {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.07); }
+  50%  { transform: scale(0.97); }
+  70%  { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+.button:active, .style-card.selected, .calendar-day.selected {
+  animation: microBounce 0.35s ease forwards;
 }
 
   /* Style cards image */
@@ -82,6 +107,8 @@ body {
 }
 
 .button {
+  position: relative;
+  overflow: hidden;
   width: 100%;
   padding: 14px;
   background: linear-gradient(135deg, #f5b7a3, #e59a84);
@@ -95,19 +122,43 @@ body {
   transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
-.button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(245,183,163,0.45);
+.button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -75%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    transparent,
+    rgba(255,255,255,0.5),
+    transparent
+  );
+  transform: skewX(-25deg);
+  transition: left 0.7s ease;
 }
 
+.button:hover::before {
+  left: 125%;
+}
+
+.button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(245,183,163,0.5);
+}
+
+
 .style-card, .booking-card {
-  background: rgba(255,255,255,0.85);
-  backdrop-filter: blur(6px);
+  background: rgba(255,255,255,0.75);
+  backdrop-filter: blur(10px);
   padding: 16px;
   margin: 14px 0;
-  border-radius: 18px;
-  box-shadow: 0 12px 30px rgba(75,63,54,0.12);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border-radius: 20px;
+  box-shadow: 
+    0 12px 30px rgba(75,63,54,0.12),
+    0 0 0 1px rgba(255,255,255,0.4) inset;
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
 }
 
 .style-card:hover {
@@ -239,6 +290,94 @@ input:focus, select:focus {
   font-size: 18px;
   display: none;
 }
+
+/* Modal overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: none;        /* Hidden by default */
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+/* Show the modal */
+.modal-overlay.show {
+  display: flex;
+}
+
+/* Modal content box */
+.modal-content {
+  position: relative;
+  background: #fff;
+  padding: 30px 40px;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 90%;
+  text-align: center;
+  overflow: hidden; /* ensures confetti stays within */
+}
+
+/* Close button */
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.loader {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 70px;
+  height: 70px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 4px solid rgba(245,183,163,0.2);
+  border-top: 4px solid #d4af37;
+  animation: spinLux 1s linear infinite;
+  display: none;
+  z-index: 9999;
+  box-shadow:
+    0 0 15px rgba(212,175,55,0.6),
+    0 0 30px rgba(212,175,55,0.3);
+}
+
+.loader.active {
+  display: block;
+}
+
+@keyframes spinLux {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.gold-shimmer {
+  background: linear-gradient(
+    90deg,
+    #c8a95e 0%,
+    #f8e7b5 25%,
+    #fff5d1 50%,
+    #f8e7b5 75%,
+    #c8a95e 100%
+  );
+  background-size: 200% auto;
+  color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: shimmer 3s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
 
 /* Modal overlay */
 .modal {
@@ -382,7 +521,6 @@ input:focus, select:focus {
   animation: popIn 0.5s ease forwards;
 }
 
-
 /* Responsive modal for mobile */
 @media (max-width: 500px) {
   .modal-content {
@@ -486,7 +624,6 @@ input:focus, select:focus {
   background: #E74C3C;
 }
 
-  
 .booking-card.pending { border-left: 5px solid #F1C40F; background-color: #fff9e6; }
 .booking-card.accepted { border-left: 5px solid #27AE60; background-color: #e6fff0; }
 .booking-card.declined { border-left: 5px solid #E74C3C; background-color: #ffe6e6; }
@@ -602,7 +739,6 @@ input:focus, select:focus {
   font-weight: bold;
   box-shadow: 0 10px 25px rgba(192,57,43,0.4);
 }
- 
 </style>
 </head>
 
@@ -610,17 +746,22 @@ input:focus, select:focus {
 
 <!-- Progress -->
 <div class="progress-container">
-  <div id="step1" class="progress-step active"></div>
+  <div id="step1" class="progress-step"></div>
   <div id="step2" class="progress-step"></div>
   <div id="step3" class="progress-step"></div>
   <div id="step4" class="progress-step"></div>
   <div id="step5" class="progress-step"></div>
+  <div id="step6" class="progress-step"></div>
+  <div id="step7" class="progress-step"></div>
 </div>
 
+<div id="loader" class="loader"></div>
+
 <!-- Screens -->
-<div id="home" class="screen active">
-  <h1>Mumsy Braids Studio</h1>
+<div id="home" class="screen">
+<h1 class="gold-shimmer">Mumsy Braids Studio</h1>
   <audio id="bookingSound" src="ding.mp3" preload="auto"></audio>
+<audio id="successSound" src="success.mp3" preload="auto"></audio>
 
   <button class="button" onclick="showScreen('styles',2)">
     Book Appointment
@@ -727,37 +868,67 @@ input:focus, select:focus {
 
 
   <button class="button" onclick="showScreen('date',4)">Back</button>
-<button class="button submit-btn" id="button submit-btn" onclick="handleBooking('sms')">
+<button class="button submit-btn" id="button submit-btn" onclick="goToReview('sms')">
   ✅ Confirm Booking (SMS)
 </button>
 
-<button class="button submit-btn" id="button submit-btn" onclick="handleBooking('whatsapp')">
+<button class="button submit-btn" id="button submit-btn" onclick="goToReview('whatsapp')">
   📱 Send Booking on WhatsApp
 </button>
 
 </div>
 
+<div id="review" class="screen">
+  <h2>📝 Review Your Booking</h2>
+
+  <div id="reviewDetails"></div>
+
+  <button class="button" onclick="showScreen('client',5)">
+    ⬅ Back
+  </button>
+
+  <button class="button" onclick="confirmBooking()">
+    ✅ Confirm & Pay Deposit
+  </button>
+</div>
+
 <div id="confirmation" class="screen">
   <h2>✅ Booking Confirmed</h2>
-  <p>Style: <span id="cStyle"></span></p>
-  <p>Length: <span id="cLength"></span></p>
-  <p>Estimated Time: <span id="cTimeEstimate"></span></p>
-  <p>Total: R<span id="cPrice"></span></p>
-  <p>Date: <span id="cDate"></span></p>
-  <p>Time: <span id="cTime"></span></p>
   <p>Name: <span id="cName"></span></p>
   <p>Phone: <span id="cPhone"></span></p>
   <p>Email: <span id="cEmail"></span></p>
+  <p>Style: <span id="cStyle"></span></p>
+  <p>Length: <span id="cLength"></span></p>
+  <p>Appointment Date: <span id="cDate"></span></p>
+  <p>Time: <span id="cTime"></span></p>
   <p>Status: <span id="cStatus"></span></p>
   <p>Total: R<span id="cPrice"></span></p>
+<div id="depositSection">
   <p>Deposit Paid: R<span id="cDeposit"></span></p>
-  <p>Balance Due: R<span id="cBalance"></span></p>
+  <p>Balance Due (Cash on Appointment Date): R<span id="cBalance"></span></p>
+</div>
   <p>Payment Status: <span id="cPaymentStatus"></span></p>
   <p>Hair Prep: Wash & dry hair before appointment</p>
   <p>Cancellation: 24h notice required</p>
-  <button class="button" onclick="showScreen('client',5)">Back</button>
-  <button class="button" onclick="showScreen('home',1)">Done</button>
+ <button id="backButton" class="button">Back</button>
+<button id="doneButton" class="button">Done</button>
 </div>
+
+<!-- Thank You Modal -->
+<div id="thankYouModal" class="modal">
+  <div class="modal-content luxury-success">
+    <canvas id="modalConfettiCanvas"></canvas>
+
+    <h2 class="gold-shimmer">Booking Confirmed</h2>
+    <p class="thank-you-text">
+      Thank you for choosing Mumsy Braids Studio
+    </p>
+
+    <button id="closeSuccessBtn" class="button">Done</button>
+  </div>
+</div>
+
+<audio id="successSound" src="success.mp3" preload="auto"></audio>
 
   <!-- Admin Login Modal -->
 <div id="adminLoginModal" class="modal">
@@ -824,16 +995,17 @@ const firebaseConfig = {
   const markPitchedFn = httpsCallable(functions, "markPitched");
 
   console.log("🔥 Firebase Initialized Correctly");
-  
+
 // ----------------- VARIABLES -----------------
 let selectedStyle = "";
 let selectedLength = "";
 let selectedDate = "";
 let selectedPrice = 0;
+let pendingBooking = null;
 let selectedTimeEstimate = "";
 let ADMIN_CLOSED_DAYS = {};
 let isSubmitting = false;
-  let currentYear;
+let currentYear;
 let currentMonth; // 0–11
 const WORK_START = 8;  // 08:00
 const WORK_END = 17;  // 17:00
@@ -851,46 +1023,81 @@ const PUBLIC_HOLIDAYS = [
   "2026-12-16", // Day of Reconciliation
   "2026-12-25"  // Christmas Day
 ];
-  
+
+
+const urlParams = new URLSearchParams(window.location.search);
+const bookingId = urlParams.get("bookingId");
+const reference = urlParams.get("reference");
+    
   // ----------------- SCREEN NAVIGATION -----------------
+// ----------------- SCREEN NAVIGATION -----------------
 function showScreen(id, step) {
+  const loader = document.getElementById("loader");
+
+  // Show loader only for confirmation
+  if (id === "confirmation" && loader) {
+    loader.classList.add("active"); // show loader immediately
+  }
+
+  // Remove active from all screens
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
 
-  for (let i = 1; i <= 5; i++)
-    document.getElementById('step'+i).classList.remove('active');
-  for (let i = 1; i <= step; i++)
-    document.getElementById('step'+i).classList.add('active');
+  const target = document.getElementById(id);
+  if (!target) {
+    console.warn("Screen not found:", id);
+    if (loader) loader.classList.remove("active");
+    return;
+  }
 
+  // Confirmation screen: wait one frame to ensure loader is painted
+  if (id === "confirmation" && loader) {
+    requestAnimationFrame(() => {
+      target.classList.add('active');
+      // loader will be removed later after data is loaded
+    });
+  } else {
+    target.classList.add('active');
+  }
+
+  // Update step progress
+  if (step) {
+    for (let i = 1; i <= 5; i++) {
+      const stepEl = document.getElementById('step' + i);
+      if (stepEl) stepEl.classList.remove('active');
+    }
+    for (let i = 1; i <= step; i++) {
+      const stepEl = document.getElementById('step' + i);
+      if (stepEl) stepEl.classList.add('active');
+    }
+  }
+
+  // Date screen logic
   if (id === "date") {
-  const now = new Date();
-  currentYear = now.getFullYear();
-  currentMonth = now.getMonth();
-
-  loadAdminClosedDays(currentYear);
-  renderCalendar(currentYear, currentMonth);
-
-  setTimeout(enableCalendarSwipe, 100);
+    const now = new Date();
+    currentYear = now.getFullYear();
+    currentMonth = now.getMonth();
+    loadAdminClosedDays(currentYear);
+    renderCalendar(currentYear, currentMonth);
+    setTimeout(enableCalendarSwipe, 100);
+  }
 }
 
-if (id === "date") {
-  const now = new Date();
-  currentYear = now.getFullYear();
-  currentMonth = now.getMonth();
-  renderCalendar(currentYear, currentMonth);
+// Screen Switch
+function switchScreen(currentId, nextId) {
+  const current = document.getElementById(currentId);
+  const next = document.getElementById(nextId);
+  current.classList.remove('active');
+  setTimeout(() => next.classList.add('active'), 50);
 }
 
-  if (id === "date") {
-  const now = new Date();
-  currentYear = now.getFullYear();
-  currentMonth = now.getMonth();
-  renderCalendar(currentYear, currentMonth);
+// Micro-bounce Selection
+document.querySelectorAll('.style-card, .calendar-day').forEach(el => {
+  el.addEventListener('click', () => {
+    el.classList.add('selected');
+    setTimeout(() => el.classList.remove('selected'), 400);
+  });
+});
 
-  setTimeout(enableCalendarSwipe, 100); // ✅ enable swipe
-}
-
-  if (id === "confirmation") displayConfirmation();
-}
 
 function getHourFromTime(timeStr) {
   // "13:00" → 13
@@ -1241,30 +1448,6 @@ async function loadAdminClosedDays(year) {
   }
 }
 
-// ----------------- DISPLAY CONFIRMATION -----------------
-function displayConfirmation() {
-  const booking = JSON.parse(localStorage.getItem("latestBooking"));
-  if(!booking) return;
-  document.getElementById("cStyle").textContent = booking.style;
-  document.getElementById("cLength").textContent = booking.length;
-  document.getElementById("cPrice").textContent = booking.price;
-  document.getElementById("cTimeEstimate").textContent = booking.timeEstimate;
-  document.getElementById("cDate").textContent = booking.date;
-  document.getElementById("cTime").textContent = booking.time;
-  document.getElementById("cName").textContent = booking.clientName;
-  document.getElementById("cPhone").textContent = booking.clientPhone;
-  document.getElementById("cEmail").textContent = booking.clientEmail;
-  document.getElementById("cStatus").textContent = booking.status;
-document.getElementById("cDeposit").textContent =
-  booking.depositPaid || 0;
-
-document.getElementById("cBalance").textContent =
-  booking.balanceRemaining;
-
-document.getElementById("cPaymentStatus").textContent =
-  booking.paymentStatus;
-}
-
 function validateClientForm() {
   const nameInput = document.getElementById("clientName");
   const phoneInput = document.getElementById("clientPhone");
@@ -1289,53 +1472,365 @@ function validateClientForm() {
   });
 }
 
-async function handleBooking(method) {
-    if (!selectedStyle || !selectedLength || !selectedPrice || !selectedTimeEstimate || !selectedDate) {
-        alert("Please complete all fields before proceeding.");
-        return;
-    }
+// ----------------- REVIEW -----------------
+function goToReview(method) {
 
-    const clientName = document.getElementById("clientName").value.trim();
-    const clientPhone = document.getElementById("clientPhone").value.trim();
-    const clientEmail = document.getElementById("clientEmail").value.trim();
+  if (!selectedStyle || !selectedLength || !selectedDate) {
+    alert("Please complete all steps.");
+    return;
+  }
 
-    const bookingData = { 
-        style: selectedStyle,
-        length: selectedLength,
-        clientName,
-        clientPhone,
-        email: clientEmail,
-        date: selectedDate,
-        time: selectedTimeEstimate,
-        method
-    };
+  const clientName = document.getElementById("clientName").value.trim();
+  const clientPhone = document.getElementById("clientPhone").value.trim();
+  const clientEmail = document.getElementById("clientEmail").value.trim();
+  const selectedTime = document.getElementById("clientTime").value;
 
-    const bookingBtn = document.querySelector(".submit-btn");
-    bookingBtn.disabled = true;
-    bookingBtn.innerText = "Processing...";
+  if (!clientName || !clientPhone || !selectedTime) {
+    alert("Please complete all required fields.");
+    return;
+  }
 
-    try {
-        const response = await createBooking(bookingData);
+  pendingBooking = {
+    style: selectedStyle,
+    length: selectedLength,
+    price: selectedPrice,
+    timeEstimate: selectedTimeEstimate,
+    date: selectedDate,
+    time: selectedTime,
+    clientName,
+    clientPhone,
+    clientEmail,
+    method
+  };
 
-        const { authorization_url, bookingId } = response.data;
-
-        if (authorization_url) {
-            window.location.href = authorization_url;
-        } else if (bookingId) {
-            alert("Booking created successfully.");
-        } else {
-            alert("Unexpected server response.");
-        }
-
-    } catch (err) {
-        console.error("Booking error:", err);
-        alert(err.message || "Payment initialization failed.");
-    } finally {
-        bookingBtn.disabled = false;
-        bookingBtn.innerText = "Confirm Booking";
-    }
+  renderReview();
+  showScreen("review", 6);
 }
-  
+
+// ----------------- RENDER REVIEW -----------------
+function renderReview() {
+  const el = document.getElementById("reviewDetails");
+  if (!el) return;
+
+  const price = pendingBooking.price;
+  const DEPOSIT_THRESHOLD = 100;
+
+  let depositHTML = "";
+  let balanceHTML = "";
+
+  if (price >= DEPOSIT_THRESHOLD) {
+    const deposit = Math.round(price * 0.45);
+    const balance = price - deposit;
+
+    depositHTML = `
+      <p style="color:#27AE60;">
+        <strong>Deposit Required (45%):</strong> R${deposit}
+      </p>
+    `;
+
+    balanceHTML = `
+      <p><strong>Balance Due at Appointment:</strong> R${balance}</p>
+    `;
+  } else {
+    depositHTML = `
+      <p style="color:#27AE60;">
+        <strong>Deposit:</strong> Not Required
+      </p>
+    `;
+  }
+
+  el.innerHTML = `
+    <p><strong>Style:</strong> ${pendingBooking.style}</p>
+    <p><strong>Length:</strong> ${pendingBooking.length}</p>
+
+    <hr>
+
+    <p><strong>Total Price:</strong> R${price}</p>
+    ${depositHTML}
+    ${balanceHTML}
+
+    <hr>
+
+    <p><strong>Date:</strong> ${pendingBooking.date}</p>
+    <p><strong>Time:</strong> ${pendingBooking.time}</p>
+
+    <hr>
+
+    <p><strong>Name:</strong> ${pendingBooking.clientName}</p>
+    <p><strong>Phone:</strong> ${pendingBooking.clientPhone}</p>
+    <p><strong>Email:</strong> ${pendingBooking.clientEmail || "N/A"}</p>
+  `;
+}
+
+  // ----------------- DISPLAY CONFIRMATION -----------------
+async function displayConfirmation(idOrReference) {
+  // Pass bookingId or reference to loadConfirmation
+  await loadConfirmation(idOrReference);
+}
+
+// ----------------- DISPLAY CONFIRMATION -----------------
+async function confirmBooking() {
+  if (!pendingBooking) return;
+
+  const loader = document.getElementById("loader");
+  if (loader) loader.classList.add("active"); // show loader immediately
+
+  try {
+    const response = await createBooking({
+      style: pendingBooking.style,
+      length: pendingBooking.length,
+      clientName: pendingBooking.clientName,
+      clientPhone: pendingBooking.clientPhone,
+      date: pendingBooking.date,
+      time: pendingBooking.time,
+      method: pendingBooking.method,
+      email: pendingBooking.clientEmail
+    });
+
+    const data = response.data || {};
+    const authorization_url = data.authorization_url;
+    const bookingId = data.bookingId || data.id; // fallback if your backend uses "id"
+    const reference = data.reference || data.ref;
+
+    const DEPOSIT_THRESHOLD = 100;
+
+    // If booking requires a deposit and Paystack URL is present → redirect immediately
+    if (pendingBooking.price >= DEPOSIT_THRESHOLD && authorization_url) {
+      window.location.href = authorization_url; // skip confirmation flick
+      return;
+    }
+
+    // Otherwise show confirmation screen (no deposit / fully paid)
+    await loadConfirmation(bookingId || reference);
+
+  } catch (err) {
+    alert("❌ Booking failed: " + err.message);
+    console.error(err);
+  } finally {
+    if (loader) loader.classList.remove("active");
+  }
+}
+
+  // ----------------- LOAD CONFIRMATION -----------------
+async function loadConfirmation(idOrReference) {
+  const loader = document.getElementById("loader");
+  if (loader) loader.classList.add("active");
+
+  try {
+    let bookingRef;
+
+    if (!idOrReference) throw new Error("No booking reference provided");
+
+    // Determine if idOrReference is Firestore docId or Paystack reference
+    if (idOrReference.length === 20) {
+      bookingRef = doc(db, "bookings", idOrReference);
+    } else {
+      const q = query(collection(db, "bookings"), where("reference", "==", idOrReference));
+      const snap = await getDocs(q);
+      if (!snap.empty) bookingRef = snap.docs[0].ref;
+    }
+
+    if (!bookingRef) throw new Error("Booking not found");
+
+    const snap = await getDoc(bookingRef);
+    if (!snap.exists()) throw new Error("Booking not found");
+
+    const booking = snap.data();
+
+    // ----------------- FIX STATUS & PAYMENT -----------------
+    if (booking.price >= 100) {
+      // Deposit required
+      booking.status = "Accepted";
+      booking.paymentStatus = booking.paymentMade === true ? "Deposit Paid" : "Pending Deposit";
+    } else {
+      // No deposit required
+      booking.status = "Pending";
+      booking.paymentStatus = "Full amount on Appointment Date";
+    }
+
+    // ----------------- POPULATE CONFIRMATION -----------------
+    document.getElementById("cName").textContent = booking.clientName;
+    document.getElementById("cPhone").textContent = booking.clientPhone;
+    document.getElementById("cEmail").textContent = booking.clientEmail || "N/A";
+    document.getElementById("cStyle").textContent = booking.style;
+    document.getElementById("cLength").textContent = booking.length;
+    document.getElementById("cDate").textContent = booking.date;
+    document.getElementById("cTime").textContent = booking.time;
+    document.getElementById("cPrice").textContent = booking.price;
+    document.getElementById("cStatus").textContent = booking.status;
+    document.getElementById("cPaymentStatus").textContent = booking.paymentStatus;
+
+    // Deposit section
+    const depositSection = document.getElementById("depositSection");
+    if (booking.price >= 100) {
+      depositSection.style.display = "block";
+      document.getElementById("cDeposit").textContent = Math.round(booking.price * 0.45);
+      document.getElementById("cBalance").textContent = booking.price - Math.round(booking.price * 0.45);
+    } else {
+      depositSection.style.display = "none";
+    }
+
+    // Done button
+const doneButton = document.getElementById("doneButton");
+
+if (doneButton) {
+  doneButton.onclick = () => {
+
+    showSuccessModal(() => {
+      fullResetBookingFlow();
+      showScreen("home", 1);
+    });
+
+  };
+}
+
+    showScreen("confirmation", 7);
+
+  } catch (err) {
+    console.error("Error loading confirmation:", err);
+    document.getElementById("confirmation").innerHTML = `
+      <h2>⚠ Unable to Load Booking</h2>
+      <p>Please check your internet connection and refresh.</p>
+    `;
+    showScreen("confirmation", 7);
+  } finally {
+    if (loader) loader.classList.remove("active");
+  }
+}
+
+function showSuccessAnimation(callback) {
+  const modal = document.getElementById("thankYouModal");
+  const confettiCanvas = document.getElementById("modalConfettiCanvas");
+
+  modal.classList.add("show");
+  confettiCanvas.width = modal.querySelector(".modal-content").offsetWidth;
+  confettiCanvas.height = modal.querySelector(".modal-content").offsetHeight;
+
+  confetti.create(confettiCanvas, { resize: true, useWorker: true })({
+    particleCount: 100,
+    spread: 70,
+    origin: { y: 0.3 }
+  });
+
+  setTimeout(() => {
+    hideThankYouModal();
+    if (callback) callback();
+  }, 5000);
+}
+
+// ---------------- SUCCESS MODAL (SINGLE SYSTEM) ----------------
+function showSuccessModal(callback) {
+  const modal = document.getElementById("thankYouModal");
+  const canvas = document.getElementById("modalConfettiCanvas");
+  const content = modal.querySelector(".modal-content");
+  const closeBtn = document.getElementById("closeSuccessBtn");
+  const sound = document.getElementById("successSound");
+
+  if (!modal || !canvas || !content) return;
+
+  // Show modal
+  modal.classList.add("show");
+
+  // Size canvas to modal content
+  canvas.width = content.offsetWidth;
+  canvas.height = content.offsetHeight;
+
+  // Launch gold confetti inside modal
+  const myConfetti = confetti.create(canvas, {
+    resize: true,
+    useWorker: true
+  });
+
+  myConfetti({
+    particleCount: 120,
+    spread: 75,
+    origin: { y: 0.4 },
+    colors: ["#d4af37", "#f8e7b5", "#ffffff", "#c8a95e"]
+  });
+
+  // Play soft luxury sound
+  if (sound) {
+    sound.volume = 0.4;
+    sound.currentTime = 0;
+    sound.play().catch(() => {});
+  }
+
+  // Close logic (manual)
+  function closeModal() {
+    modal.classList.remove("show");
+
+    setTimeout(() => {
+      if (callback) callback();
+    }, 300);
+  }
+
+  closeBtn.onclick = closeModal;
+
+  // Auto close after 5 seconds
+  setTimeout(closeModal, 5000);
+}
+
+  // ----------------- RESET PROGRESS -----------------
+function resetProgress() {
+  document.querySelectorAll(".progress-step")
+    .forEach(step => step.classList.remove("active"));
+
+  const step1 = document.getElementById("step1");
+  if (step1) step1.classList.add("active");
+}
+
+  // ----------------- FULL RESET -----------------
+function fullResetBookingFlow() {
+
+  // 1️⃣ Reset pending booking object
+  pendingBooking = {
+    style: null,
+    length: null,
+    price: 0,
+    date: null,
+    time: null,
+    clientName: null,
+    clientPhone: null,
+    clientEmail: null,
+    method: null
+  };
+
+  // 2️⃣ Clear all client input fields
+  const fieldsToClear = [
+    "clientName",
+    "clientPhone",
+    "clientEmail",
+    "clientDate",
+    "clientTime"
+  ];
+
+  fieldsToClear.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+
+  // 3️⃣ Remove validation checkmarks
+  const checks = document.querySelectorAll(".checkmark");
+  checks.forEach(c => c.style.display = "none");
+
+  // 4️⃣ Clear validation errors
+  const errors = document.querySelectorAll(".error");
+  errors.forEach(e => e.textContent = "");
+
+  // 5️⃣ Reset calendar selection
+  document.querySelectorAll("#calendar .selected").forEach(day => {
+    day.classList.remove("selected");
+  });
+
+  // 6️⃣ Reset time dropdown
+  const timeSelect = document.getElementById("clientTime");
+  if (timeSelect) timeSelect.selectedIndex = 0;
+
+  // 7️⃣ Reset progress steps
+  resetProgress();
+}
+
+// ----------------- ESTIMATED MINUTES -----------------
 function getMinutesFromEstimate(estimate) {
   // Example: "3 – 4 hours" → take MAX value
   const numbers = estimate.match(/\d+(\.\d+)?/g);
@@ -1671,7 +2166,8 @@ window.selectStyle = selectStyle;
 window.selectLength = selectLength;
 window.changeMonth = changeMonth;
 window.validateClientForm = validateClientForm;
-window.handleBooking = handleBooking;
+window.goToReview = goToReview;
+window.confirmBooking = confirmBooking;
 window.closeAdminLogin = hideAdminModal;
 window.toggleAdminPassword = toggleAdminPassword;
 window.adminLogin = adminLogin;
@@ -1681,6 +2177,14 @@ window.markPitched = markPitched;
 window.updateBookingStatus = updateBookingStatus;
 window.deleteBooking = deleteBooking;
 window.clearBookingsForDate = clearBookingsForDate;
+
+if (bookingId || reference) {
+  const loader = document.getElementById("loader");
+  if (loader) loader.classList.add("active");
+  await loadConfirmation(bookingId || reference); // ensures Paystack redirect doesn't flick home
+} else {
+  showScreen("home", 1);
+}
 
 });
           
