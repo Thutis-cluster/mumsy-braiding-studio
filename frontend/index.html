@@ -17,7 +17,6 @@
 </script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-
 <style>
 body {
   font-family: 'Poppins', sans-serif;
@@ -82,6 +81,58 @@ body {
 }
 .button:active, .style-card.selected, .calendar-day.selected {
   animation: microBounce 0.35s ease forwards;
+}
+
+/* Luxury Holiday Styling */
+.calendar-day.holiday {
+  border: 1px solid #d4af37;
+ background: linear-gradient(145deg, #fffdf5, #fff7e6);
+  box-shadow: 0 0 6px rgba(212,175,55,0.3);
+}
+
+.holiday-popup {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: linear-gradient(135deg, #d4af37, #f8e7b5);
+  color: #4b3f36;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(212,175,55,0.4);
+  opacity: 0;
+  transition: all 0.3s ease;
+  z-index: 9999;
+}
+
+.holiday-popup.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Tiny Gold Badge */
+.holiday-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #d4af37, #f8e7b5);
+  color: #4b3f36;
+  font-size: 8px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(212,175,55,0.4);
+  pointer-events: none;
+}
+
+@keyframes holidayGlow {
+  0%   { box-shadow: 0 0 8px rgba(212,175,55,0.4); }
+  50%  { box-shadow: 0 0 18px rgba(212,175,55,0.6); }
+  100% { box-shadow: 0 0 8px rgba(212,175,55,0.4); }
 }
 
   /* Style cards image */
@@ -241,10 +292,30 @@ h2 {
   display: block;
 }
 
-  button:disabled {
-  background-color: #e0d5cc;
+/* Disabled look */
+.button:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
-  opacity: 0.7;
+  box-shadow: none;
+  transition: all 0.3s ease;
+}
+
+/* Premium glow animation */
+@keyframes premiumGlow {
+  0% {
+    box-shadow: 0 0 0 rgba(212, 175, 55, 0);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(212, 175, 55, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(212, 175, 55, 0);
+  }
+}
+
+/* Active glow class */
+.premium-glow {
+  animation: premiumGlow 1.4s ease;
 }
 
   input:required {
@@ -378,16 +449,51 @@ input:focus, select:focus {
   100% { background-position: -200% center; }
 }
 
+.form-hint {
+  font-size: 13px;
+  margin-top: 6px;
+  min-height: 18px;
+  text-align: center;
+  color: #c0392b;
+  transition: opacity 0.3s ease;
+}
+
+/* Red glow for invalid fields */
+.invalid-field {
+  border: 2px solid #e74c3c;
+  box-shadow: 0 0 8px #e74c3c;
+  animation: pulse 0.6s ease-in-out 2;
+  transition: box-shadow 0.5s, border 0.5s;
+}
+
+.invalid-field.fade-out {
+  box-shadow: none !important;
+  border-color: #ccc !important;
+  animation: none !important;
+}
+
+.pulse-glow {
+  animation: pulseGlow 0.8s ease-in-out 2;
+}
+
+/* Soft pulse animation instead of shake */
+@keyframes pulseGlow {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
 
 /* Modal overlay */
 .modal {
   display: none;
   position: fixed;
-  z-index: 1000;
+  z-index: 9999;
   left: 0;
   top: 0;
   width: 100%;
   height: 100%;
+  opacity: 0;
+  pointer-events: none;
   background-color: rgba(75, 63, 54, 0.7); /* soft transparent brown */
   backdrop-filter: blur(4px); /* glassy feel */
   transition: opacity 0.3s ease;
@@ -395,12 +501,27 @@ input:focus, select:focus {
 
 .modal.show {
   display: block;
-  animation: fadeInSlide 0.4s ease;
+  opacity: 1;
+  pointer-events: auto;
 }
 
-@keyframes fadeInSlide {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
+.modal.show .modal-content {
+  animation: luxuryFade 0.45s ease forwards;
+}
+
+@keyframes luxuryFade {
+  0% {
+    opacity: 0;
+    transform: translateY(-25px) scale(0.95);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(5px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Modal content box */
@@ -541,8 +662,32 @@ input:focus, select:focus {
 }
 
 /* Apply shake */
-.modal-content.shake {
+.shake {
   animation: shake 0.45s ease;
+}
+
+/* Login button loading state */
+.btn-spinner {
+  display: none;
+  width: 18px;
+  height: 18px;
+  border: 3px solid rgba(255,255,255,0.4);
+  border-top: 3px solid #ffffff;
+  border-radius: 50%;
+  animation: spinBtn 0.7s linear infinite;
+  margin: auto;
+}
+
+@keyframes spinBtn {
+  to { transform: rotate(360deg); }
+}
+
+.button.loading .btn-text {
+  display: none;
+}
+
+.button.loading .btn-spinner {
+  display: block;
 }
 
 #dailySummary {
@@ -840,26 +985,31 @@ input:focus, select:focus {
 
 <div id="calendar"></div>
 <input type="hidden" id="clientDate">
-<select id="clientTime" onchange="validateClientForm()">
+<select id="clientTime" onchange="validateDateTimeStep()">
   <option value="">Select time</option>
   <option>08:00</option>
-  <option>10:30</option>
-  <option>13:00</option>
+  <option>09:00</option>
+  <option>11:00</option>
+  <option>13:30</option>
+  <option>14:30</option>
+  <option>16:00</option>
 </select>
   <button class="button" onclick="showScreen('length',3)">Back</button>
-  <button class="button" onclick="showScreen('client',4)">Next</button>
+<button id="dateNextBtn" class="button" onclick="goToClientScreen()" disabled>
+  Next
+</button>
 </div>
 
 <div id="client" class="screen">
   <h2>Your Details</h2>
 <div class="input-group">
-  <input id="clientName" placeholder="Full Name *" required oninput="validateClientForm()">
+  <input id="clientName" placeholder="Please Enter Your Full Name *" required oninput="validateClientForm()">
   <span class="checkmark" id="nameCheck">✔</span>
 </div>
 <span class="error" id="nameError"></span>
 
 <div class="input-group">
-  <input id="clientPhone" placeholder="Phone *" required oninput="validateClientForm()">
+  <input type="tel" id="clientPhone" placeholder="Phone Numbers *" pattern="[0-9+\s]{9,15}" required oninput="validateClientForm()">
   <span class="checkmark" id="phoneCheck">✔</span>
 </div>
 <span class="error" id="phoneError"></span>
@@ -875,6 +1025,7 @@ input:focus, select:focus {
 <button class="button submit-btn" id="button submit-btn" onclick="goToReview('whatsapp')">
   📱 Send Booking on WhatsApp
 </button>
+<p id="formHint" class="form-hint"></p>
 
 </div>
 
@@ -942,7 +1093,10 @@ input:focus, select:focus {
   <span class="toggle-password" onclick="toggleAdminPassword()">👁️</span>
   </div>
 
-    <button class="button" onclick="adminLogin()">Login</button>
+<button class="button" id="adminLoginBtn" onclick="adminLogin()">
+  <span class="btn-text">Login</span>
+  <span class="btn-spinner"></span>
+</button>
     <p class="forgot-password" onclick="forgotAdminPassword()">🔑 Forgot password?</p>
      <p id="adminLoginError" class="error"></p>
   </div>
@@ -964,7 +1118,7 @@ input:focus, select:focus {
   // ----------------- FIREBASE -----------------
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, doc, getDoc,  writeBatch} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, setPersistence, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, setPersistence, inMemoryPersistence,   browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -986,7 +1140,8 @@ const firebaseConfig = {
   const db = getFirestore(app);
   const auth = getAuth(app);
   window.auth = auth;
-  await setPersistence(auth, inMemoryPersistence);
+
+await setPersistence(auth, browserSessionPersistence);
   const functions = getFunctions(app, "us-central1");
 
   const createBooking = httpsCallable(functions, "createBooking");
@@ -1029,8 +1184,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const bookingId = urlParams.get("bookingId");
 const reference = urlParams.get("reference");
     
-  // ----------------- SCREEN NAVIGATION -----------------
-// ----------------- SCREEN NAVIGATION -----------------
+  // ----------------- SCREEN 
 function showScreen(id, step) {
   const loader = document.getElementById("loader");
 
@@ -1080,6 +1234,8 @@ function showScreen(id, step) {
     renderCalendar(currentYear, currentMonth);
     setTimeout(enableCalendarSwipe, 100);
   }
+validateDateTimeStep();
+
 }
 
 // Screen Switch
@@ -1220,6 +1376,7 @@ function selectLength(length) {
   showScreen("date", 4);
 }
 
+// ----------------- HANDLE CALENDER DATE SELECTION -----------------
   function handleDateSelection() {
   const dateInput = document.getElementById("clientDate");
   const selectedDate = dateInput.value;
@@ -1347,9 +1504,12 @@ function getFamilyDay(year) {
   return date.toISOString().split("T")[0];
 }
 
- function renderCalendar(year, month) {
+// ----------------- RENDER CALENDAR -----------------
+function renderCalendar(year, month) {
   const calendar = document.getElementById("calendar");
   const title = document.getElementById("calendarTitle");
+const holidays = getSouthAfricanHolidays(year);
+
 
   calendar.innerHTML = "";
   calendar.className = "calendar";
@@ -1392,9 +1552,20 @@ function getFamilyDay(year) {
     const dayOfWeek = dateObj.getDay(); // 0 = Sunday
 
     // Disable past days
-    if (dateObj < today) {
-      div.classList.add("disabled");
-    }
+  if (dateObj < today) {
+  div.classList.add("disabled");
+}
+
+// Lock TODAY if it's 16:00 or later
+const now = new Date();
+if (
+  dateStr === now.toISOString().split("T")[0] &&
+  now.getHours() >= 16
+) {
+  div.classList.add("disabled");
+  div.title = "Bookings closed for today";
+}
+
 
     // Disable Sundays
     if (dayOfWeek === 0) {
@@ -1403,22 +1574,34 @@ function getFamilyDay(year) {
     }
 
     // Disable public holidays
-    if (PUBLIC_HOLIDAYS.includes(dateStr)) {
-      div.classList.add("disabled");
-      div.title = "Closed on public holidays";
-    }
+if (holidays[dateStr]) {
+  div.classList.add("disabled");
+  div.classList.add("holiday");
+  div.dataset.holidayName = holidays[dateStr];
+}
 
-    div.onclick = () => {
-      if (div.classList.contains("disabled")) return;
+div.onclick = () => {
 
-      document.querySelectorAll(".calendar-day")
-        .forEach(d => d.classList.remove("selected"));
+  if (div.dataset.holidayName) {
+    showHolidayPopup(div.dataset.holidayName);
+    return;
+  }
 
-      div.classList.add("selected");
-      document.getElementById("clientDate").value = dateStr;
-  selectedDate = dateStr; 
-      validateClientForm();
-    };
+  if (div.classList.contains("disabled")) return;
+
+  document.querySelectorAll(".calendar-day")
+    .forEach(d => d.classList.remove("selected"));
+
+  div.classList.add("selected");
+  selectedDate = dateStr;
+
+  // 🔥 ADD THIS LINE
+  const hiddenDateInput = document.getElementById("clientDate");
+  if (hiddenDateInput) hiddenDateInput.value = dateStr;
+
+  lockPastTimes();
+  validateDateTimeStep();
+};
 
     calendar.appendChild(div);
   }
@@ -1448,29 +1631,189 @@ async function loadAdminClosedDays(year) {
   }
 }
 
+function showHolidayPopup(name) {
+  const popup = document.createElement("div");
+  popup.classList.add("holiday-popup");
+  popup.textContent = name;
+
+  document.body.appendChild(popup);
+
+  setTimeout(() => {
+    popup.classList.add("show");
+  }, 10);
+
+  setTimeout(() => {
+    popup.classList.remove("show");
+    setTimeout(() => popup.remove(), 300);
+  }, 2500);
+}
+
+
+// ----------------- LOCK PAST TIMES -----------------
+function lockPastTimes() {
+  const select = document.getElementById("clientTime");
+  if (!select || !selectedDate) return;
+
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+
+  let currentSelectionStillValid = true;
+
+  Array.from(select.options).forEach(option => {
+    if (!option.value) return;
+
+    option.disabled = false;
+
+    if (selectedDate === todayStr) {
+      const optionHour = getHourFromTime(option.value);
+      const currentHour = now.getHours();
+
+      if (optionHour <= currentHour) {
+        option.disabled = true;
+
+        if (option.selected) {
+          currentSelectionStillValid = false;
+        }
+      }
+    }
+  });
+
+  // 🔥 FORCE RESET if invalid time was selected
+  if (!currentSelectionStillValid) {
+    select.value = "";
+  }
+
+validateDateTimeStep();
+}
+
+document.getElementById("clientTime").addEventListener("change", validateDateTimeStep);
+
+
+// ----------------- NEXT BUTTON DISABLED -----------------
+function goToClientScreen() {
+  const time = document.getElementById("clientTime").value;
+
+  if (!selectedDate || !time) return;
+
+  pendingBooking = {
+    ...pendingBooking,
+    date: selectedDate,
+    time: time
+  };
+
+  showScreen("client", 4);
+}
+
+function validateDateTimeStep() {
+  const date = document.getElementById("clientDate")?.value || "";
+  const time = document.getElementById("clientTime")?.value || "";
+  const nextBtn = document.getElementById("dateNextBtn");
+
+  if (!nextBtn) return;
+
+  const shouldEnable = date !== "" && time !== "";
+
+  if (shouldEnable && nextBtn.disabled) {
+    nextBtn.disabled = false;
+    nextBtn.classList.add("premium-glow");
+
+    setTimeout(() => {
+      nextBtn.classList.remove("premium-glow");
+    }, 1400);
+  }
+
+  if (!shouldEnable) {
+    nextBtn.disabled = true;
+  }
+}
+
+// ----------------- VALIDE CLIENT FORM -----------------
 function validateClientForm() {
+  const nextBtn = document.getElementById("dateNextBtn");
   const nameInput = document.getElementById("clientName");
   const phoneInput = document.getElementById("clientPhone");
   const dateInput = document.getElementById("clientDate");
   const timeInput = document.getElementById("clientTime");
+  const hint = document.getElementById("formHint");
 
-  const nameCheck = document.getElementById("nameCheck");
-  const phoneCheck = document.getElementById("phoneCheck");
+phoneInput.addEventListener("input", () => {
+  // Allow only digits, +, and space
+  phoneInput.value = phoneInput.value.replace(/[^0-9+\s]/g, '');
+});
 
-  const nameValid = nameInput.value.trim() !== "";
-  const phoneValid = phoneInput.value.trim() !== "";
-  const dateValid = dateInput.value !== "";
-  const timeValid = timeInput.value !== "";
-
-  // ✔ checkmarks
-  nameCheck.style.display = nameValid ? "block" : "none";
-  phoneCheck.style.display = phoneValid ? "block" : "none";
-
-  // 🔘 enable / disable submit buttons
-  document.querySelectorAll(".submit-btn").forEach(btn => {
-    btn.disabled = !(nameValid && phoneValid && dateValid && timeValid);
+  // Reset previous invalid styles
+  [nameInput, phoneInput, dateInput, timeInput].forEach(input => {
+    input.classList.remove("invalid-field", "pulse-glow");
   });
+
+  let message = "";
+  let firstInvalid = null;
+
+  // Validation checks
+  if (!nameInput.value.trim()) {
+    message = "Please enter your full name.";
+    firstInvalid = nameInput;
+  } else if (!phoneInput.value.trim() || !/^[0-9+\s]{9,15}$/.test(phoneInput.value.trim())) {
+    message = "Please enter a valid phone number.";
+    firstInvalid = phoneInput;
+  } else if (!dateInput.value) {
+    message = "Please select a booking date.";
+    firstInvalid = dateInput;
+  } else if (!timeInput.value) {
+    message = "Please select a time slot.";
+    firstInvalid = timeInput;
+  }
+
+  // Apply red glow + pulse + scroll to first invalid
+  if (firstInvalid) {
+    firstInvalid.classList.add("invalid-field", "pulse-glow");
+
+    // Smooth scroll
+    firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    // Auto-remove glow after 2.5 seconds
+    setTimeout(() => {
+      firstInvalid.classList.remove("pulse-glow");
+    }, 2500);
+  }
+
+  // Update hint message
+hint.textContent = message;
+hint.style.opacity = "0"; // hide by default
+
+  // Enable or disable submit button
+  const isValid = !message;
+ document.querySelectorAll(".submit-btn").forEach(btn => {
+  btn.dataset.valid = isValid ? "true" : "false";
+});
 }
+
+document.querySelectorAll(".submit-btn").forEach(btn => {
+  btn.addEventListener("click", (e) => {
+
+    const isValid = btn.dataset.valid === "true";
+
+    if (!isValid) {
+      e.preventDefault();
+
+      const hint = document.getElementById("formHint");
+      if (!hint) return;
+
+      hint.textContent = "⚠ Please complete all required fields.";
+      hint.style.opacity = "1";
+
+      setTimeout(() => {
+        hint.style.opacity = "0";
+      }, 3000);
+
+      validateClientForm(); // triggers red glow on invalid fields
+      return;
+    }
+
+    // If valid → continue normally
+    goToReview(btn.dataset.method || "default");
+  });
+});
 
 // ----------------- REVIEW -----------------
 function goToReview(method) {
@@ -1489,6 +1832,17 @@ function goToReview(method) {
     alert("Please complete all required fields.");
     return;
   }
+
+const now = new Date();
+const todayStr = now.toISOString().split("T")[0];
+
+if (selectedDate === todayStr) {
+  const selectedHour = getHourFromTime(selectedTime);
+  if (selectedHour <= now.getHours()) {
+    alert("⛔ You cannot book a past time.");
+    return;
+  }
+}
 
   pendingBooking = {
     style: selectedStyle,
@@ -1592,6 +1946,9 @@ async function confirmBooking() {
     const bookingId = data.bookingId || data.id; // fallback if your backend uses "id"
     const reference = data.reference || data.ref;
 
+    // ✅ Clear URL to prevent refresh redirect
+    window.history.replaceState({}, document.title, window.location.pathname);
+
     const DEPOSIT_THRESHOLD = 100;
 
     // If booking requires a deposit and Paystack URL is present → redirect immediately
@@ -1601,7 +1958,17 @@ async function confirmBooking() {
     }
 
     // Otherwise show confirmation screen (no deposit / fully paid)
-    await loadConfirmation(bookingId || reference);
+const ref = bookingId || reference;
+
+sessionStorage.setItem("lastBookingReference", ref);
+
+// Clear URL
+window.history.replaceState({}, document.title, window.location.pathname);
+
+await loadConfirmation(ref);
+
+// Remove immediately so refresh won't reload it
+sessionStorage.removeItem("lastBookingReference");
 
   } catch (err) {
     alert("❌ Booking failed: " + err.message);
@@ -1828,6 +2195,9 @@ function fullResetBookingFlow() {
 
   // 7️⃣ Reset progress steps
   resetProgress();
+
+sessionStorage.removeItem("lastBookingReference");
+window.history.replaceState({}, document.title, window.location.pathname);
 }
 
 // ----------------- ESTIMATED MINUTES -----------------
@@ -1850,7 +2220,6 @@ const TIME_PER_SLOT_MINUTES = 90; // 1.5 hours
   });
 }
 
-// Open modal when admin button clicked
 // ------------------ Show modal when admin button is clicked ------------------
 document.getElementById("adminBtn").addEventListener("click", () => {
   showAdminModal();
@@ -1874,7 +2243,28 @@ function showAdminModal() {
 function hideAdminModal() {
   const modal = document.getElementById("adminLoginModal");
   modal.classList.remove("show");
+
+  // Clear fields
+  document.getElementById("adminEmail").value = "";
+  document.getElementById("adminPassword").value = "";
+  document.getElementById("adminLoginError").textContent = "";
+
+  // Make sure home screen is visible
+  showScreen("home", 1);
 }
+
+// ------------------ PRESS ENTER AFTER PASSWORD ------------------
+document.getElementById("adminPassword").addEventListener("keypress", function (e) {
+  if (e.key === "Enter") {
+    adminLogin();
+  }
+});
+
+document.getElementById("adminEmail").addEventListener("keypress", function (e) {
+  if (e.key === "Enter") {
+    adminLogin();
+  }
+});
 
 // ------------------ Hide modal after successful login ------------------
 function onAdminLoginSuccess() {
@@ -1887,8 +2277,14 @@ async function adminLogin() {
   const email = document.getElementById("adminEmail").value;
   const password = document.getElementById("adminPassword").value;
   const errorEl = document.getElementById("adminLoginError");
+  const loginBtn = document.getElementById("adminLoginBtn");
+  const modalContent = document.querySelector("#adminLoginModal .modal-content");
 
   errorEl.textContent = "";
+
+  // Start loading state
+  loginBtn.classList.add("loading");
+  loginBtn.disabled = true;
 
   try {
     // 1️⃣ Sign in
@@ -1905,11 +2301,25 @@ async function adminLogin() {
     openAdmin();
 
   } catch (err) {
+
+    // Shake animation
+    modalContent.classList.add("shake");
+    setTimeout(() => {
+      modalContent.classList.remove("shake");
+    }, 400);
+
     console.error("LOGIN ERROR:", err);
     errorEl.textContent = "❌ Login failed: " + err.message;
 
-    // Safety: sign out if partially logged in
+    // Clear password
+    document.getElementById("adminPassword").value = "";
+
+    // Safety logout
     await signOut(auth);
+  } finally {
+    // ALWAYS reset button state
+    loginBtn.classList.remove("loading");
+    loginBtn.disabled = false;
   }
 }
 
@@ -1937,30 +2347,32 @@ async function forgotAdminPassword() {
 
 // Keep only one onAuthStateChanged listener
 auth.onAuthStateChanged(async (user) => {
-  const adminBtn = document.getElementById("adminBtn");
+  const lastBooking = sessionStorage.getItem("lastBookingReference");
 
-  if (!user) {
-    showScreen("home", 1);
-    return;
-  }
+  // 🔐 If admin is logged in → ALWAYS go to admin only
+  if (user) {
+    try {
+      const verifyFn = httpsCallable(functions, "verifyAdmin");
+      await verifyFn();
 
-  try {
-    // Verify admin via backend
-    const verifyFn = httpsCallable(functions, "verifyAdmin");
-    await verifyFn();
-
-    // Only open admin if freshly logged in
-    if (sessionStorage.getItem("adminJustLoggedIn")) {
       openAdmin();
-      sessionStorage.removeItem("adminJustLoggedIn");
+      return; // STOP here. Never load confirmation.
+    } catch (err) {
+      await signOut(auth);
+      showScreen("home", 1);
+      return;
     }
-
-  } catch (err) {
-    // Not an admin → force logout
-    await signOut(auth);
-    showScreen("home", 1);
   }
-});
+
+ // 👤 Normal user
+showScreen("home", 1);
+
+// Clean URL if someone manually pasted confirmation link
+const params = new URLSearchParams(window.location.search);
+if (params.has("bookingId") || params.has("reference")) {
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
+});     
 
  function toggleAdminPassword() {
   const passwordInput = document.getElementById("adminPassword");
@@ -1976,7 +2388,15 @@ auth.onAuthStateChanged(async (user) => {
 }
 
 function adminLogout() {
+ sessionStorage.removeItem("lastBookingReference"); // ✅ clear it
+
   auth.signOut().then(() => {
+
+    // Clear login fields
+    document.getElementById("adminEmail").value = "";
+    document.getElementById("adminPassword").value = "";
+    document.getElementById("adminLoginError").textContent = "";
+
     showScreen("home", 1);
   });
 }
@@ -2165,6 +2585,7 @@ window.showScreen = showScreen;
 window.selectStyle = selectStyle;
 window.selectLength = selectLength;
 window.changeMonth = changeMonth;
+window.goToClientScreen = goToClientScreen;
 window.validateClientForm = validateClientForm;
 window.goToReview = goToReview;
 window.confirmBooking = confirmBooking;
@@ -2177,14 +2598,6 @@ window.markPitched = markPitched;
 window.updateBookingStatus = updateBookingStatus;
 window.deleteBooking = deleteBooking;
 window.clearBookingsForDate = clearBookingsForDate;
-
-if (bookingId || reference) {
-  const loader = document.getElementById("loader");
-  if (loader) loader.classList.add("active");
-  await loadConfirmation(bookingId || reference); // ensures Paystack redirect doesn't flick home
-} else {
-  showScreen("home", 1);
-}
 
 });
           
