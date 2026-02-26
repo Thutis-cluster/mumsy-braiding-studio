@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mumsy Braids Studio Admin</title>
+
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+<!-- =================== PREMIUM CSS =================== -->
+<style>
+/* --- GLOBAL --- */
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
+body{background:#fef9f4;color:#333;line-height:1.6;font-size:16px;}
+.screen{
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 0.35s ease;
+  position:absolute;
+  top:0;
+  left:0;
+  width:100%;
+  min-height:100vh;
+  padding:50px 20px;
+}
+
+.screen.active{
+  opacity:1;
+  pointer-events:auto;
+  position:relative;
+}
+
+body.dark{
+  background:#121212;
+  color:#f5f5f5;
+}
+
+body.dark .booking-card,
+body.dark .style-card,
+body.dark .modal-content{
+  background:#1e1e1e;
+  color:#fff;
+}
+
+body.dark .button{
+  background:#333;
+}
+
+/* --- GOLD SHIMMER --- */
+.gold-shimmer{
+  font-family:'Playfair Display',serif;
+  font-size:3rem;
+  background:linear-gradient(90deg,#b88c4a,#ffd700,#b88c4a);
+  background-size:200% auto;
+  color:transparent;
+  -webkit-background-clip:text;
+  background-clip:text;
+  animation:shimmer 2.5s linear infinite;
+  text-align:center;
+  margin-bottom:50px;
+}
+@keyframes shimmer{0%{background-position:-200% center;}100%{background-position:200% center;}}
+
+/* --- BUTTONS --- */
+.button{
+  padding:12px 24px;border:none;border-radius:8px;
+  background:#b88c4a;color:#fff;font-weight:500;cursor:pointer;
+  transition:all 0.25s ease;box-shadow:0 4px 6px rgba(0,0,0,0.1);
+  margin:5px 0;
+}
+.button:hover{background:#a3733f;transform:translateY(-2px);}
+.button.decline{background:#e74c3c;} .button.decline:hover{background:#c0392b;}
+.button.accept{background:#27ae60;} .button.accept:hover{background:#1e8449;}
+.button.danger{background:#c0392b;} 
+.button.clear{background:#2980b9;} .button.clear:hover{background:#1c5980;}
+
+/* --- MODAL --- */
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);
+  z-index:1000;align-items:center;justify-content:center;transition:all 0.3s ease;}
+.modal.show{display:flex;}
+.modal-content{background:#fff8f0;padding:40px 30px;border-radius:15px;max-width:400px;width:90%;
+  position:relative;box-shadow:0 10px 30px rgba(0,0,0,0.15);animation:fadeIn 0.5s ease-out;}
+.modal-content.shake{animation:shake 0.4s;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-20px);}to{opacity:1;transform:translateY(0);}}
+@keyframes shake{0%{transform:translateX(0);}25%{transform:translateX(-5px);}50%{transform:translateX(5px);}75%{transform:translateX(-5px);}100%{transform:translateX(0);}}
+.modal-content h2{font-family:'Playfair Display',serif;color:#b88c4a;margin-bottom:20px;text-align:center;}
+.close{position:absolute;top:15px;right:20px;font-size:1.5rem;color:#333;cursor:pointer;transition:all 0.2s ease;}
+.close:hover{color:#b88c4a;}
+
+/* --- INPUTS --- */
+input[type="email"], input[type="password"]{
+  width:100%;padding:12px 15px;margin-bottom:15px;border:2px solid #b88c4a;border-radius:8px;outline:none;font-size:1rem;
+  transition:border 0.3s ease;
+}
+input:focus{border-color:#ffd700;}
+.password-wrapper{position:relative;}
+.toggle-password{position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:1.2rem;}
+.forgot-password {
+  cursor: pointer;
+  color: #b88c4a;
+  text-align: center;
+  margin-top: 10px;
+  text-decoration: underline;
+}
+.forgot-password:hover {
+  color: #ffd700;
+}
+
+/* --- ERROR TEXT --- */
+.error{color:#e74c3c;font-size:0.9rem;margin-top:-10px;margin-bottom:10px;text-align:center;}
+.spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #b88c4a;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 0.8s linear infinite;
+  margin: 40px auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* --- BOOKING CARDS --- */
+.booking-card{
+  background:#fff;
+  padding:20px;
+  margin-bottom:15px;
+  border-radius:12px;
+  box-shadow:0 6px 15px rgba(0,0,0,0.05);
+  transform:translateX(-30px);
+  opacity:0;
+  animation:slideIn 0.4s ease forwards;
+}
+
+@keyframes slideIn{
+  to{
+    transform:translateX(0);
+    opacity:1;
+  }
+}
+
+.booking-card.pending{border-left:4px solid #f39c12;}
+.booking-card.accepted{border-left:4px solid #27ae60;}
+.booking-card.declined{border-left:4px solid #e74c3c;}
+@keyframes fadeInCard{to{opacity:1;transform:translateY(0);}}
+.booking-buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;}
+.status-buttons button{flex:1;}
+.pitch-buttons button{margin-right:5px;}
+
+/* --- DAILY SUMMARY --- */
+.style-card{background:#fff8f0;padding:15px;margin-bottom:12px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.05);}
+
+/* --- RESPONSIVE --- */
+@media(max-width:768px){
+  .modal-content{padding:30px 20px;}
+  .booking-buttons{flex-direction:column;}
+  .status-buttons button{width:100%;}
+  .pitch-buttons button{width:48%;margin-bottom:5px;}
+}
+
+@media(max-width:600px){
+
+  #admin h2{
+    font-size:1.3rem;
+    text-align:center;
+  }
+
+  canvas{
+    margin-bottom:20px;
+  }
+
+  .booking-card{
+    padding:15px;
+    font-size:0.9rem;
+  }
+
+  .button{
+    width:100%;
+  }
+}
+
+</style>
+
+<!-- =================== FIREBASE + CONFETTI + SOUND =================== -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<audio id="bookingSound" src="ding.mp3" preload="auto"></audio>
+
+</head>
+<body>
+
+<!-- ==================== HOME SCREEN ==================== -->
+<div id="home" class="screen active">
+  <h1 class="gold-shimmer">Mumsy Braids Studio</h1>
+
+  <!-- Admin button hidden by default -->
+<button class="button" id="adminBtn">
+  💼 Owner Admin Panel
+</button>
+</div>
+
+<!-- ==================== ADMIN LOGIN MODAL ==================== -->
+<div id="adminLoginModal" class="modal">
+  <div class="modal-content">
+    <span class="close" id="closeModal">&times;</span>
+    <h2>🔐 Owner Login</h2>
+    <input type="email" id="adminEmail" placeholder="Admin Email">
+    <div class="password-wrapper">
+      <input type="password" id="adminPassword" placeholder="Password">
+      <span class="toggle-password"></span>
+    </div>
+<button class="button" id="adminLoginBtn">
+  <span class="btn-text">Login</span>
+  <span class="spinner" style="display:none;"></span>
+</button>
+    <p class="forgot-password" id="forgotPassword">🔑 Forgot password?</p>
+    <p id="adminLoginError" class="error"></p>
+  </div>
+</div>
+
+<!-- ==================== ADMIN PANEL ==================== -->
+<div id="admin" class="screen">
+<button class="button" id="darkModeToggle">🌙 Dark Mode</button>
+  <button class="button decline" id="logoutBtn">🚪 Logout</button>
+  <h2>💼 Owner Admin Panel</h2>
+  <div id="bookingsList">
+    <div id="dailySummary"></div>
+    <p>Loading bookings...</p>
+  </div>
+  <button id="clearAllBtn" class="button danger">Clear All Bookings</button>
+<div id="calendar"></div>
+<div id="monthlyStats" class="style-card"></div>
+<canvas id="revenueChart" height="100"></canvas>
+<canvas id="styleChart" height="100"></canvas>
+<canvas id="yearlyChart" height="120"></canvas>
+</div>
+
+<script type="module">
+
+  // ----------------- FIREBASE -----------------
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, doc, getDoc,  writeBatch} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, setPersistence, inMemoryPersistence,   browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
+
+document.addEventListener("DOMContentLoaded", async () => {
+
+  console.log("🔥 Script Loaded Properly");
+
+  // ---------------- FIREBASE INIT ----------------
+const firebaseConfig = {
+  apiKey: "AIzaSyCcChD_9sMvxncp7hulcwhKlUyJ87BR7zs",
+  authDomain: "braiding-bookings.firebaseapp.com",
+  projectId: "braiding-bookings",
+  storageBucket: "braiding-bookings.firebasestorage.app",
+  messagingSenderId: "243406972406",
+  appId: "1:243406972406:web:2ab34ed5ab3491af5553d7",
+  measurementId: "G-4XLV27JNW8"
+};
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+  window.auth = auth;
+
+await setPersistence(auth, browserSessionPersistence);
+  const functions = getFunctions(app, "us-central1");
+
+let unsubscribeBookings = null;
+
+// ------------------ Show Screen ------------------
+function showScreen(screenId) {
+  const screens = document.querySelectorAll(".screen");
+
+  screens.forEach(s => s.classList.remove("active"));
+
+  const target = document.getElementById(screenId);
+
+  if (!target) {
+    console.warn("Screen not found:", screenId);
+    return;
+  }
+
+  target.classList.add("active");
+}
+
+// ------------------ Show modal  ------------------
+document.getElementById("adminBtn").addEventListener("click", () => {
+  showAdminModal();
+});
+
+document.getElementById("adminLoginBtn")
+  .addEventListener("click", adminLogin);
+
+document.getElementById("closeModal")
+  .addEventListener("click", hideAdminModal);
+
+document.getElementById("logoutBtn").addEventListener("click", adminLogout);
+
+// ------------------ Show modal function ------------------
+function showAdminModal() {
+  const modal = document.getElementById("adminLoginModal");
+  modal.classList.add("show");
+
+  // Clicking outside closes the modal
+  modal.addEventListener("click", function onOutsideClick(e) {
+    if (e.target === modal) {
+      hideAdminModal();
+      modal.removeEventListener("click", onOutsideClick);
+    }
+  });
+}
+
+// ------------------ Hide modal function ------------------
+function hideAdminModal() {
+  const modal = document.getElementById("adminLoginModal");
+  modal.classList.remove("show");
+
+  // Clear fields
+  document.getElementById("adminEmail").value = "";
+  document.getElementById("adminPassword").value = "";
+  document.getElementById("adminLoginError").textContent = "";
+
+  // Make sure home screen is visible
+  showScreen("home");
+}
+
+// ------------------ PRESS ENTER AFTER PASSWORD ------------------
+document.getElementById("adminPassword").addEventListener("keypress", function (e) {
+  if (e.key === "Enter") {
+    adminLogin();
+  }
+});
+
+document.getElementById("adminEmail").addEventListener("keypress", function (e) {
+  if (e.key === "Enter") {
+    adminLogin();
+  }
+});
+
+// ------------------ Hide modal after successful login ------------------
+function onAdminLoginSuccess() {
+  hideAdminModal();  // hide modal
+  showScreen("admin"); 
+  openAdmin();       // open admin panel
+}
+
+async function adminLogin() {
+  const email = document.getElementById("adminEmail").value;
+  const password = document.getElementById("adminPassword").value;
+  const errorEl = document.getElementById("adminLoginError");
+  const loginBtn = document.getElementById("adminLoginBtn");
+  const modalContent = document.querySelector("#adminLoginModal .modal-content");
+
+  errorEl.textContent = "";
+
+  // Start loading state
+const spinner = loginBtn.querySelector(".spinner");
+const text = loginBtn.querySelector(".btn-text");
+
+text.style.display = "none";
+spinner.style.display = "inline-block";
+loginBtn.disabled = true;
+
+  try {
+    // 1️⃣ Sign in
+    await signInWithEmailAndPassword(auth, email, password);
+
+    // 2️⃣ Verify admin via backend
+    const verifyFn = httpsCallable(functions, "verifyAdmin");
+    await verifyFn();
+
+    // 3️⃣ Mark this as a fresh login
+    sessionStorage.setItem("adminJustLoggedIn", "true");
+
+    hideAdminModal();
+    openAdmin();
+
+  } catch (err) {
+
+    // Shake animation
+    modalContent.classList.add("shake");
+    setTimeout(() => {
+      modalContent.classList.remove("shake");
+    }, 400);
+
+    console.error("LOGIN ERROR:", err);
+    errorEl.textContent = "❌ Login failed: " + err.message;
+
+    // Clear password
+    document.getElementById("adminPassword").value = "";
+
+    // Safety logout
+    await signOut(auth);
+  } finally {
+    // ALWAYS reset button state
+const spinner = loginBtn.querySelector(".spinner");
+const text = loginBtn.querySelector(".btn-text");
+
+spinner.style.display = "none";
+text.style.display = "inline";
+loginBtn.disabled = false;
+  }
+}
+
+// Forgot Password function
+async function forgotAdminPassword() {
+  const email = document.getElementById("adminEmail").value.trim();
+  const errorEl = document.getElementById("adminLoginError");
+  errorEl.textContent = "";
+
+  if (!email) {
+    errorEl.textContent = "❌ Please enter your admin email.";
+    return;
+  }
+
+  try {
+    const forgotFn = httpsCallable(functions, "forgotAdminPassword");
+    const result = await forgotFn({ email });
+
+    alert(result.data.message); // e.g., "If this email is registered as an admin, a reset email has been sent."
+  } catch (err) {
+    console.error("Forgot password error:", err);
+    errorEl.textContent = "❌ " + (err.message || "Failed to send reset email");
+  }
+}
+
+// Keep only one onAuthStateChanged listener
+onAuthStateChanged(auth, async (user) => {
+  const lastBooking = sessionStorage.getItem("lastBookingReference");
+
+  // 🔐 If admin is logged in → ALWAYS go to admin only
+  if (user) {
+    try {
+      const verifyFn = httpsCallable(functions, "verifyAdmin");
+      await verifyFn();
+
+      openAdmin();
+      return; // STOP here. Never load confirmation.
+    } catch (err) {
+      await signOut(auth);
+      showScreen("home");
+      return;
+    }
+  }
+
+ // 👤 Normal user
+showScreen("home");
+
+// Clean URL if someone manually pasted confirmation link
+const params = new URLSearchParams(window.location.search);
+if (params.has("bookingId") || params.has("reference")) {
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
+});     
+
+ function toggleAdminPassword() {
+  const passwordInput = document.getElementById("adminPassword");
+  const icon = document.querySelector(".toggle-password");
+
+  if (passwordInput.type === "password") {
+    passwordInput.type = "text";
+    icon.textContent = "🙈";
+  } else {
+    passwordInput.type = "password";
+    icon.textContent = "👁️";
+  }
+}
+
+async function adminLogout() {
+  sessionStorage.removeItem("lastBookingReference");
+
+  await signOut(auth);
+
+  showScreen("home");
+}
+
+const darkModeBtn = document.getElementById("darkModeToggle");
+
+darkModeBtn.addEventListener("click", () => {
+  document.body.classList.toggle("dark");
+
+  const isDark = document.body.classList.contains("dark");
+  localStorage.setItem("darkMode", isDark ? "enabled" : "disabled");
+
+  darkModeBtn.textContent = isDark ? "☀️ Light Mode" : "🌙 Dark Mode";
+});
+
+if (localStorage.getItem("darkMode") === "enabled") {
+  document.body.classList.add("dark");
+  darkModeBtn.textContent = "☀️ Light Mode";
+}
+
+function estimateToHours(estimate) {
+  if (!estimate) return 0;
+
+  // Extract numbers like "4 hrs", "3.5 hours", etc.
+  const match = estimate.match(/[\d.]+/);
+  return match ? parseFloat(match[0]) : 0;
+}
+
+// ----------------- ADMIN PANEL -----------------
+async function openAdmin() {
+  if (!auth.currentUser) {
+    showScreen("home");
+    return;
+  }
+
+  showScreen("admin");
+  const list = document.getElementById("bookingsList");
+  const summary = document.getElementById("dailySummary");
+
+  // Listening for changes to the "bookings" collection
+  const bookingsRef = collection(db, "bookings");
+  const q = query(bookingsRef, orderBy("createdAt", "desc"));
+
+  if (unsubscribeBookings) unsubscribeBookings();
+
+  unsubscribeBookings = onSnapshot(q, snapshot => {
+    list.innerHTML = ""; // Clear the current list
+    summary.innerHTML = ""; // Clear the summary
+
+    const dailyTotals = {};
+    const dailyRevenue = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today to midnight
+
+    snapshot.docs.forEach(doc => {
+      const booking = doc.data();
+      const id = doc.id;
+      const dateStr = booking.date || "Unknown";
+      const bookingDate = booking.date ? new Date(booking.date) : today;
+      bookingDate.setHours(0, 0, 0, 0); // Normalize the date
+
+      const hours = estimateToHours(booking.timeEstimate || "0");
+      dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + hours;
+
+      // Calculate revenue only for pitched bookings
+      if (booking.pitched === "yes") {
+        dailyRevenue[dateStr] = (dailyRevenue[dateStr] || 0) + (booking.price || 0);
+      } else {
+        dailyRevenue[dateStr] = dailyRevenue[dateStr] || 0;
+      }
+
+      // Determine booking status class
+      const statusClass = 
+        booking.status === "Pending" ? "pending" :
+        booking.status === "Accepted" ? "accepted" :
+        booking.status === "Declined" ? "declined" : "pending";
+
+      // Render booking card with pitch options
+      let pitchHTML = "";
+      if (bookingDate <= today) {
+        if (!booking.pitched || booking.pitched === "pending") {
+          pitchHTML = `
+            <div class="pitch-buttons">
+              <button class="button pitch" onclick="markPitched('${id}', 'yes')">Pitched</button>
+              <button class="button nopitch" onclick="markPitched('${id}', 'no')">Didn't Pitch</button>
+            </div>
+          `;
+        } else {
+          pitchHTML = `<p>Pitched: ${booking.pitched}</p>`;
+        }
+      } else {
+        pitchHTML = `<p>Pitched: Pending</p>`;
+      }
+
+      // Create the booking card
+      const card = document.createElement("div");
+      card.className = `booking-card ${statusClass}`;
+      card.innerHTML = `
+        <p><strong>${booking.clientName || "Unknown Client"}</strong></p>
+        <p>${booking.style || "Unknown Style"} – ${booking.length || "Unknown Length"}</p>
+        <p>⏱ ${booking.timeEstimate || "0 hrs"}</p>
+        <p>${dateStr} @ ${booking.time || "Unknown Time"}</p>
+        <p>Status: ${booking.status || "Pending"}</p>
+        <div class="booking-buttons">
+          <div class="status-buttons">
+            <button class="button accept" onclick="updateBookingStatus('${id}','Accepted')">Accept</button>
+            <button class="button decline" onclick="updateBookingStatus('${id}','Declined')">Decline</button>
+          </div>
+          ${pitchHTML}
+          <div class="delete-button">
+            <button class="button delete" onclick="deleteBooking('${id}')">Delete</button>
+          </div>
+        </div>
+      `;
+      list.appendChild(card);
+    });
+
+    // Render daily summary
+    for (const date in dailyTotals) {
+      const div = document.createElement("div");
+      div.className = "style-card";
+      div.innerHTML = `
+        <strong>${date}</strong><br>
+        ⏱ Work: ${dailyTotals[date]} hrs<br>
+        💰 Revenue: R${dailyRevenue[date]}<br>
+        <button class="button clear" onclick="clearBookingsForDate('${date}')">Clear</button>
+      `;
+      summary.appendChild(div);
+    }
+  });
+}
+  
+async function markPitched(id, value) {
+  try {
+    const fn = httpsCallable(functions, "markPitched");
+    await fn({ bookingId: id, value });
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function updateBookingStatus(id, status) {
+  try {
+    const fn = httpsCallable(functions, "updateBookingStatus");
+    await fn({ bookingId: id, status });
+    alert("✅ Status updated");
+  } catch (err) {
+    alert("❌ Failed: " + err.message);
+  }
+}
+  
+async function deleteBooking(id) {
+  if (!confirm("Delete this booking?")) return;
+
+  try {
+    const fn = httpsCallable(functions, "deleteBooking");
+    await fn({ bookingId: id });
+    alert("✅ Booking deleted");
+  } catch (err) {
+    alert("❌ Failed: " + err.message);
+  }
+}
+
+function clearBookingsForDate(date) {
+  if (!confirm(`Are you sure you want to clear all bookings for ${date}?`)) return;
+
+  const bookingsRef = collection(db, "bookings");
+  const q = query(bookingsRef, where("date", "==", date));
+
+  getDocs(q)
+    .then(snapshot => {
+      const batch = writeBatch(db);
+      snapshot.forEach(doc => {
+        batch.delete(doc.ref); // Delete each document in the snapshot
+      });
+
+      return batch.commit(); // Commit the batch operation
+    })
+    .then(() => {
+      alert(`✅ All bookings for ${date} have been cleared`);
+    })
+    .catch(err => {
+      console.error("Error clearing bookings:", err);
+      alert("❌ Failed to clear bookings");
+    });
+}
+
+  function resetSubmitButtons() {
+  isSubmitting = false;
+  document.querySelectorAll(".submit-btn").forEach(btn => {
+    btn.disabled = false;
+    btn.textContent = btn.textContent.includes("SMS")
+      ? "✅ Confirm Booking (SMS)"
+      : "📱 Send Booking on WhatsApp";
+  });
+}
+
+document.getElementById("clearAllBtn").onclick = async function () {
+  if (!confirm("Delete ALL bookings?")) return;
+
+  try {
+    const fn = httpsCallable(functions, "clearAllBookings");
+    await fn();
+    alert("✅ All bookings cleared");
+  } catch (err) {
+    alert("❌ Failed: " + err.message);
+  }
+};
+
+// 🔥 Expose functions to HTML (because we use type="module")
+window.showScreen = showScreen;
+window.closeAdminLogin = hideAdminModal;
+window.toggleAdminPassword = toggleAdminPassword;
+window.adminLogin = adminLogin;
+window.forgotAdminPassword = forgotAdminPassword;
+window.adminLogout = adminLogout;
+window.estimateToHours = estimateToHours;
+window.markPitched = markPitched;
+window.updateBookingStatus = updateBookingStatus;
+window.deleteBooking = deleteBooking;
+window.clearBookingsForDate = clearBookingsForDate;
+  });
+        
+</script>
+
+</body>
+</html>
