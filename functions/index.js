@@ -84,16 +84,18 @@ async function logAdminAction(adminId, action, details = {}) {
 
 // -------------------- CREATE BOOKING --------------------
 export const createBooking = onCall(
-  { secrets: ["PAYSTACK_SECRET"], timeoutSeconds: 150 },
+  { secrets: ["PAYSTACK_SECRET"], timeoutSeconds: 420 },
   async (request) => {
     try {
       const { style, length, clientName, clientPhone, date, time, method, email } = request.data;
 
       // Validate required fields
       if (!style || !length || !clientName || !clientPhone || !date || !time || !email) {
-        console.error("❌ createBooking error: Missing required fields", request.data);
         throw new Error("Missing required booking fields.");
       }
+
+      const validatedPhone = validatePhone(clientPhone);
+      const validatedEmail = validateEmail(email);
 
       // Determine price
       const priceMap = {
@@ -108,78 +110,96 @@ export const createBooking = onCall(
         throw new Error("Invalid style or length selected.");
       }
 
-      // Calculate deposit
       const DEPOSIT_PERCENT = 0.45;
       const DEPOSIT_THRESHOLD = 100;
-      let depositPaid = 0;
-      let balanceRemaining = price;
 
-      if (price >= DEPOSIT_THRESHOLD) {
-        depositPaid = Math.round(price * DEPOSIT_PERCENT);
-        balanceRemaining = price - depositPaid;
+      // ---------------- NO DEPOSIT REQUIRED ----------------
+      if (price < DEPOSIT_THRESHOLD) {
+        const bookingRef = await db.collection("bookings").add({
+          style,
+          length,
+          price,
+          depositRequired: 0,
+          depositPaid: 0,
+          balanceRemaining: price,
+          clientName,
+          clientPhone: validatedPhone,
+          clientEmail: validatedEmail,
+          date,
+          time,
+          method,
+          status: "Pending",
+          paymentStatus: "No Deposit Required",
+          reminderSent: false,
+          deleted: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        return { bookingId: bookingRef.id };
       }
 
-      // Create booking in Firestore
-      const bookingRef = await db.collection("bookings").add({
-        style,
-        length,
-        price,
-        depositPaid,
-        balanceRemaining,
-        clientName,
-        clientPhone: validatePhone(clientPhone),
-        clientEmail: validateEmail(email),
-        date,
-        time,
-        method,
-        status: "Pending",
-        paymentStatus: depositPaid > 0 ? "Deposit Pending" : "No Deposit Required",
-        reminderSent: false,
-        deleted: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      // ---------------- DEPOSIT REQUIRED ----------------
+      const depositRequired = Math.round(price * DEPOSIT_PERCENT);
 
-      // If deposit is required, initialize Paystack payment
-      if (depositPaid > 0) {
-        try {
-          const response = await axios.post(
-            "https://api.paystack.co/transaction/initialize",
-            {
-              email,
-              amount: depositPaid * 100, // Paystack expects kobo
-              metadata: { bookingId: bookingRef.id },
-            callback_url: `https://braiding-bookings.web.app/confirmation?bookingId=${bookingRef.id}`
-            },
-            {
-              headers: {
-                Authorization: `Bearer ${process.env.PAYSTACK_SECRET}`,
-                "Content-Type": "application/json"
-              }
-            }
-          );
+// 1️⃣ Create a booking document first (status = Pending Payment)
+ const bookingRef = await db.collection("bookings").add({
+    style,
+    length,
+    price,
+    depositRequired: depositRequired,
+    depositPaid: 0,
+    balanceRemaining: price - depositRequired,
+    clientName,
+    clientPhone: validatedPhone,
+    clientEmail: validatedEmail,
+    date,
+    time,
+    method,
+    status: "Pending Payment",
+    paymentStatus: "Deposit Required",
+    reminderSent: false,
+    deleted: false,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+});
 
-          // Log full response for debugging
-          console.log("✅ Paystack initialize response:", response.data);
-
-          if (!response.data || !response.data.data || !response.data.data.authorization_url) {
-            console.error("❌ Paystack response missing authorization_url", response.data);
-            throw new Error("Unable to initiate payment with Paystack.");
+   const response = await axios.post(
+        "https://api.paystack.co/transaction/initialize",
+        {
+          email: validatedEmail,
+          amount: depositRequired * 100,
+          metadata: {
+            bookingId: bookingRef.id,
+            style,
+            length,
+            price,
+            clientName,
+            clientPhone: validatedPhone,
+            clientEmail: validatedEmail,
+            date,
+            time,
+            method
+          },
+     callback_url: `https://braiding-bookings.web.app/confirmation?bookingId=${bookingRef.id}`
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.PAYSTACK_SECRET}`,
+            "Content-Type": "application/json"
           }
-
-          return { authorization_url: response.data.data.authorization_url };
-        } catch (payErr) {
-          console.error("❌ Paystack API error:", payErr.response?.data || payErr.message);
-          throw new Error("Payment initiation failed. Please try again later.");
         }
+      );
+
+      if (!response.data?.data?.authorization_url) {
+        throw new Error("Unable to initiate payment.");
       }
 
-      // No deposit needed, return booking ID
-      return { bookingId: bookingRef.id };
+      return {
+        authorization_url: response.data.data.authorization_url
+      };
 
     } catch (err) {
-      // Log the full error for debugging
-      console.error("❌ createBooking unexpected error:", err);
-      throw new Error(err.message || "Unable to start booking. Please contact support.");
+      console.error("❌ createBooking error:", err);
+      throw new Error(err.message || "Unable to start booking.");
     }
   }
 );
@@ -221,51 +241,63 @@ export const completePayment = onCall(async (request) => {
 });
 
 // -------------------- PAYSTACK WEBHOOK --------------------
-export const paystackWebhook = onRequest({ secrets: ["PAYSTACK_SECRET"],
-    cors: false }, async (req, res) => {
-  try {
-    if (req.method !== "POST") return res.status(405).send("Method not allowed");
+export const paystackWebhook = onRequest(
+  { secrets: ["PAYSTACK_SECRET"], cors: false },
+  async (req, res) => {
+    try {
+      if (req.method !== "POST") {
+        return res.status(405).send("Method not allowed");
+      }
 
-    const hash = crypto.createHmac("sha512", process.env.PAYSTACK_SECRET).update(Buffer.from(JSON.stringify(req.body)))
-.digest("hex");
-    if (hash !== req.headers["x-paystack-signature"]) return res.status(400).send("Invalid signature");
+      const hash = crypto
+        .createHmac("sha512", process.env.PAYSTACK_SECRET)
+        .update(Buffer.from(JSON.stringify(req.body)))
+        .digest("hex");
 
-    const event = req.body;
-    if (event.event === "charge.success") {
-      const bookingId = event.data.metadata?.bookingId;
-      if (!bookingId) return res.status(400).send("Missing bookingId");
+      if (hash !== req.headers["x-paystack-signature"]) {
+        return res.status(400).send("Invalid signature");
+      }
 
-      const bookingRef = db.collection("bookings").doc(bookingId);
-      await db.runTransaction(async (tx) => {
-        const snap = await tx.get(bookingRef);
-        if (!snap.exists) throw new Error("Booking not found");
-        const booking = snap.data();
-        if (booking.paymentStatus === "Paid") return;
+      const event = req.body;
 
-        tx.update(bookingRef, { paymentStatus: "Paid", depositPaid: event.data.amount / 100, balanceRemaining: 0, status: "Accepted" });
+     if (event.event === "charge.success") {
+  const data = event.data;
+  const bookingId = data.metadata.bookingId;
+  const depositPaid = data.amount / 100;
 
-        const msg = `✅ Booking confirmed! Hi ${booking.clientName}, your ${booking.style} appointment is confirmed.\n📅 ${booking.date}\n🕒 ${booking.time}`;
-        await sendMessage(booking.clientPhone, msg, booking.method);
-      });
+  const bookingRef = db.collection("bookings").doc(bookingId);
+  const snap = await bookingRef.get();
 
-      return res.status(200).send("Webhook processed");
-    }
-
-    return res.status(200).send("Event ignored");
-  } catch (err) {
-    console.error("Webhook error:", err);
-    return res.status(500).send("Server error");
+  if (!snap.exists) {
+    return res.status(404).send("Booking not found");
   }
-});
+
+  const booking = snap.data();
+
+  await bookingRef.update({
+    depositPaid: depositPaid,
+    balanceRemaining: booking.price - depositPaid,
+    paymentStatus: "Deposit Received",
+    status: "Pending",
+  });
+
+  return res.status(200).send("Booking updated");
+}
+
+      return res.status(200).send("Event ignored");
+    } catch (err) {
+      console.error("Webhook error:", err);
+      return res.status(500).send("Server error");
+    }
+  }
+);
 
 // -------------------- ADMIN LOGIN--------------------
 export const verifyAdmin = onCall(async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Not logged in.");
-  }
+  const { auth } = request;
+  if (!auth) throw new HttpsError("unauthenticated", "Not logged in");
 
-  const adminDoc = await db.collection("admins").doc(request.auth.uid).get();
-
+  const adminDoc = await db.collection("admins").doc(auth.uid).get();
   if (!adminDoc.exists || adminDoc.data().role !== "admin") {
     throw new HttpsError("permission-denied", "Not authorized as admin.");
   }
@@ -381,15 +413,32 @@ Please bring the remaining balance on the day of your appointment.`;
   }
 });
 
-// -------------------- MARK PITCHED/NOT --------------------
-export const markPitched = onCall(async (request) => {
-  const { bookingId, value } = request.data;
+// -------------------- CONFIRM PITCHED / NOT --------------------
+export const confirmPitched = onCall(async (request) => {
+  const { bookingId, pitched } = request.data;
   const adminId = await checkAdmin(request.auth);
 
-  if (!bookingId || !["yes", "no"].includes(value)) throw new Error("Invalid data");
+  if (!bookingId || typeof pitched !== "boolean") {
+    throw new HttpsError("invalid-argument", "Invalid data");
+  }
 
-  await db.collection("bookings").doc(bookingId).update({ pitched: value });
-  await logAdminAction(adminId, "markPitched", { bookingId, value });
+  const bookingRef = db.collection("bookings").doc(bookingId);
+  const snap = await bookingRef.get();
+
+  if (!snap.exists) {
+    throw new HttpsError("not-found", "Booking not found");
+  }
+
+  await bookingRef.update({
+    pitched: pitched,
+    pitchedConfirmedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  await logAdminAction(adminId, "confirmPitched", {
+    bookingId,
+    pitched
+  });
+
   return { success: true };
 });
 
@@ -413,6 +462,87 @@ export const calculateDailyRevenue = onSchedule(
   }
   await batch.commit();
 });
+
+// -------------------- AUTO ARCHIVE OLD BOOKINGS --------------------
+export const archiveOldBookings = onSchedule(
+  "0 2 * * *", // Runs daily at 2AM
+  async () => {
+
+    const THIRTY_DAYS_AGO = new Date();
+    THIRTY_DAYS_AGO.setDate(THIRTY_DAYS_AGO.getDate() - 30);
+
+    const snapshot = await db.collection("bookings")
+      .where("createdAt", "<=", THIRTY_DAYS_AGO)
+      .get();
+
+    if (snapshot.empty) {
+      console.log("No old bookings to archive.");
+      return;
+    }
+
+    const batch = db.batch();
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+
+      const archiveRef = db.collection("archivedBookings").doc(doc.id);
+      batch.set(archiveRef, {
+        ...data,
+        archivedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+
+    console.log(`✅ Archived ${snapshot.size} old bookings.`);
+  }
+);
+
+// -------------------- MONTHLY FINANCIAL REPORT --------------------
+export const generateMonthlyReport = onSchedule(
+  "0 3 1 * *", // 3AM on the 1st of every month
+  async () => {
+
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const nextMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const snapshot = await db.collection("bookings")
+      .where("pitched", "==", true)
+      .where("pitchedConfirmedAt", ">=", lastMonth)
+      .where("pitchedConfirmedAt", "<", nextMonth)
+      .get();
+
+    let totalRevenue = 0;
+    let totalBookings = 0;
+    let styleBreakdown = {};
+
+    snapshot.forEach(doc => {
+      const b = doc.data();
+      totalRevenue += b.price || 0;
+      totalBookings++;
+
+      if (!styleBreakdown[b.style]) {
+        styleBreakdown[b.style] = 0;
+      }
+
+      styleBreakdown[b.style] += b.price || 0;
+    });
+
+    await db.collection("monthlyReports").doc(
+      `${lastMonth.getFullYear()}-${lastMonth.getMonth()+1}`
+    ).set({
+      totalRevenue,
+      totalBookings,
+      styleBreakdown,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    console.log("✅ Monthly report generated");
+  }
+);
 
 // -------------------- TEST FUNCTION --------------------
 export const testFn = onCall(() => {
