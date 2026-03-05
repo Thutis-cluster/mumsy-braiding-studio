@@ -14,25 +14,46 @@
 
 <!-- =================== PREMIUM CSS =================== -->
 <style>
-/* --- GLOBAL --- */
-*{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
-body{background:#fef9f4;color:#333;line-height:1.6;font-size:16px;}
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
 .screen{
+  display:none;
   opacity:0;
-  pointer-events:none;
   transition:opacity 0.35s ease;
-  position:absolute;
-  top:0;
-  left:0;
   width:100%;
   min-height:100vh;
-  padding:50px 20px;
+  padding:60px 20px;
 }
 
 .screen.active{
+  display:block;
   opacity:1;
-  pointer-events:auto;
+}
+
+#admin {
+  display:flex;
+  flex-direction:column;
+  gap:40px; /* spacing between major sections */
+}
+
+#bookingsList,
+#calendar,
+#monthlyStats,
+.charts-grid {
   position:relative;
+  width:100%;
+}
+
+body{
+  background: linear-gradient(135deg,#fdf7ef,#f6efe5,#fffaf3);
+  min-height:100vh;
 }
 
 body.dark{
@@ -49,6 +70,11 @@ body.dark .modal-content{
 
 body.dark .button{
   background:#333;
+}
+
+body.dark .dashboard-card{
+  background: rgba(30,30,30,0.6);
+  border:1px solid rgba(255,255,255,0.08);
 }
 
 /* --- GOLD SHIMMER --- */
@@ -80,17 +106,55 @@ body.dark .button{
 .button.clear{background:#2980b9;} .button.clear:hover{background:#1c5980;}
 
 /* --- MODAL --- */
-.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);
-  z-index:1000;align-items:center;justify-content:center;transition:all 0.3s ease;}
-.modal.show{display:flex;}
-.modal-content{background:#fff8f0;padding:40px 30px;border-radius:15px;max-width:400px;width:90%;
-  position:relative;box-shadow:0 10px 30px rgba(0,0,0,0.15);animation:fadeIn 0.5s ease-out;}
+.modal{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100vw;
+  height:100vh;   /* force exact viewport height */
+  background:rgba(0,0,0,0.5);
+  display:none;
+  z-index:10000;
+}
+
+.modal.show{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.modal-content input {
+  box-sizing: border-box;
+}
+
+.modal-content{
+  background:#fff8f0;
+  padding:40px 30px;
+  border-radius:15px;
+  max-width:400px;
+  width:90%;
+  position:relative;
+  box-shadow:0 10px 30px rgba(0,0,0,0.15);
+}
+
 .modal-content.shake{animation:shake 0.4s;}
 @keyframes fadeIn{from{opacity:0;transform:translateY(-20px);}to{opacity:1;transform:translateY(0);}}
+
 @keyframes shake{0%{transform:translateX(0);}25%{transform:translateX(-5px);}50%{transform:translateX(5px);}75%{transform:translateX(-5px);}100%{transform:translateX(0);}}
 .modal-content h2{font-family:'Playfair Display',serif;color:#b88c4a;margin-bottom:20px;text-align:center;}
 .close{position:absolute;top:15px;right:20px;font-size:1.5rem;color:#333;cursor:pointer;transition:all 0.2s ease;}
 .close:hover{color:#b88c4a;}
+
+.modal-content form,
+.modal-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-content .button {
+  width: 100%;
+  margin-top: 10px;
+}
 
 /* --- INPUTS --- */
 input[type="email"], input[type="password"]{
@@ -186,6 +250,224 @@ input:focus{border-color:#ffd700;}
   }
 }
 
+.section-content {
+  overflow: hidden;
+  transition: max-height 0.4s ease;
+  max-height: 0;
+}
+
+.section-content.expanded {
+  max-height: 2000px; /* big enough to fit content */
+}
+
+body.dark .section-header {
+  background: #222;
+  color: #fff;
+}
+
+.glow { animation: glowPulse 1.5s infinite alternate; }
+
+@keyframes glowPulse {
+  0% { box-shadow: 0 0 5px gold; }
+  100% { box-shadow: 0 0 20px gold; }
+}
+
+.section-header {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #111;
+  color: #fff;  /* missing? you need color */
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 15px;
+}
+
+.badge {
+  background: gold;
+  color: black;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.kpi-card{
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255,255,255,0.4);
+  border:1px solid rgba(255,255,255,0.3);
+  border-radius:18px;
+  padding:25px 20px;
+  text-align:center;
+  box-shadow:0 10px 30px rgba(0,0,0,0.08);
+  transition: all 0.3s ease;
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+}
+
+.kpi-card:hover{
+  transform:translateY(-5px);
+  box-shadow:0 20px 40px rgba(0,0,0,0.12);
+}
+
+.kpi-card.highlight{
+  background: rgba(255,215,0,0.25);
+  border:1px solid rgba(255,215,0,0.4);
+}
+
+.kpi-card h5{
+  font-family:'Playfair Display',serif;
+  font-weight:600;
+  color:#b88c4a;
+  margin-bottom:10px;
+}
+
+.kpi-value{
+  font-family:'Playfair Display',serif;
+  font-size:1.7rem;
+  font-weight:700;
+  color:#111;
+}
+
+body.dark .kpi-card{
+  background: rgba(30,30,30,0.6);
+  border:1px solid rgba(255,255,255,0.08);
+}
+
+body.dark .kpi-card h5{
+  color:#ffd700;
+}
+
+body.dark .kpi-value{
+  color:#fff;
+}
+
+.dashboard-card{
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255,255,255,0.55);
+  border:1px solid rgba(255,255,255,0.4);
+  padding:25px;
+  border-radius:20px;
+  box-shadow:0 15px 35px rgba(0,0,0,0.08);
+  text-align:center;
+  transition:all 0.3s ease;
+  position:relative;
+  overflow:hidden;
+}
+
+.dashboard-card:hover{
+  transform:translateY(-6px);
+  box-shadow:0 20px 45px rgba(0,0,0,0.15);
+}
+
+.dashboard-card h4{
+  font-weight:500;
+  margin-bottom:12px;
+  color:#b88c4a;
+  letter-spacing:0.5px;
+}
+
+.dashboard-card p{
+  font-size:2rem;
+  font-weight:600;
+  font-family:'Playfair Display',serif;
+}
+
+.dashboard-card.highlight{
+  background:linear-gradient(135deg,#ffd700,#b88c4a);
+  color:#000;
+}
+
+.dashboard-card.highlight h4{
+  color:#000;
+}
+
+#calendar,
+#monthlyStats,
+canvas {
+  margin-top: 40px;
+}
+
+#bookingsList {
+  margin-bottom: 40px;
+  position: relative;
+  z-index: 1;
+  min-height: 200px;
+}
+
+.heat-cell {
+  padding: 10px;
+  text-align: center;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: bold;
+  transition: 0.2s ease;
+}
+
+.charts-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:25px;
+  margin-top:20px;
+}
+
+.chart-card{
+  backdrop-filter: blur(15px);
+  background:rgba(255,255,255,0.5);
+  border-radius:20px;
+  padding:20px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.08);
+}
+
+.chart-card h4{
+  margin-bottom:15px;
+  font-weight:500;
+  color:#b88c4a;
+  text-align:center;
+}
+
+#bookingsList{
+  display:flex;
+  flex-direction:column;
+  gap:15px;
+}
+
+.booking-card{
+  position:relative;
+  z-index:0;
+}
+
+#calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-top: 20px;
+}
+
+#monthlyStats{
+  margin-top:20px;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #fff;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 </style>
 
 <!-- =================== FIREBASE + CONFETTI + SOUND =================== -->
@@ -228,24 +510,78 @@ input:focus{border-color:#ffd700;}
 <div id="admin" class="screen">
 <button class="button" id="darkModeToggle">🌙 Dark Mode</button>
   <button class="button decline" id="logoutBtn">🚪 Logout</button>
+<input 
+  type="text" 
+  id="adminSearch"
+  placeholder="Search name, phone or email..."
+  style="width:100%;padding:10px;margin-bottom:15px;"
+>
   <h2>💼 Owner Admin Panel</h2>
-  <div id="bookingsList">
+<div id="dashboardHeader" class="dashboard-header">
+  <div class="kpi-card">
+    <h5>💰 Today</h5>
+    <p id="todayRevenue" class="kpi-value">R 0.00</p>
+  </div>
+
+  <div class="kpi-card">
+    <h5>📅 This Month</h5>
+    <p id="monthRevenue" class="kpi-value">R 0.00</p>
+  </div>
+
+  <div class="kpi-card">
+    <h5>📈 This Year</h5>
+    <p id="yearRevenue" class="kpi-value">R 0.00</p>
+  </div>
+
+  <div class="kpi-card highlight">
+    <h5>🔥 Most Profitable Style</h5>
+    <p id="topStyle" class="kpi-value">—</p>
+  </div>
+
+  <div class="kpi-card">
+    <h5>📊 Monthly Growth</h5>
+    <p id="growthRate" class="kpi-value">0%</p>
+  </div>
+</div>
+
+ <div id="bookingsList">
     <div id="dailySummary"></div>
     <p>Loading bookings...</p>
   </div>
-  <button id="clearAllBtn" class="button danger">Clear All Bookings</button>
+<div style="text-align:center; margin:20px;">
+  <button id="loadMoreBtn" class="button">Load More</button>
+</div>
+
+<!-- CALENDAR -->
 <div id="calendar"></div>
 <div id="monthlyStats" class="style-card"></div>
-<canvas id="revenueChart" height="100"></canvas>
-<canvas id="styleChart" height="100"></canvas>
-<canvas id="yearlyChart" height="120"></canvas>
+
+<!-- CHARTS -->
+<div class="charts-grid">
+  <div class="chart-card">
+    <h4>Revenue Trend</h4>
+    <canvas id="revenueChart"></canvas>
+  </div>
+
+  <div class="chart-card">
+    <h4>Style Revenue</h4>
+    <canvas id="styleChart"></canvas>
+  </div>
+
+  <div class="chart-card">
+    <h4>Year Overview</h4>
+    <canvas id="yearlyChart"></canvas>
+  </div>
 </div>
+</div>
+
+<button id="clearAllBtn" class="button danger">Clear All Bookings</button>
 
 <script type="module">
 
   // ----------------- FIREBASE -----------------
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, doc, getDoc,  writeBatch} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, doc, getDoc,  writeBatch, limit, startAfter, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, setPersistence, inMemoryPersistence,   browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
@@ -272,7 +608,18 @@ const firebaseConfig = {
 await setPersistence(auth, browserSessionPersistence);
   const functions = getFunctions(app, "us-central1");
 
+let unsubscribeAdmin = null;
 let unsubscribeBookings = null;
+let unsubscribeAnalytics = null;
+let adminRefreshInterval = null;
+let dailyRevenue = 0;
+let styleChartInstance = null;
+let revenueChartInstance = null;
+let isSubmitting = false;
+let pastLastDoc = null;
+let revenueChart, styleChart, yearlyChart;
+let loadingPast = false;
+const PAST_PAGE_SIZE = 25;
 
 // ------------------ Show Screen ------------------
 function showScreen(screenId) {
@@ -307,6 +654,7 @@ document.getElementById("logoutBtn").addEventListener("click", adminLogout);
 function showAdminModal() {
   const modal = document.getElementById("adminLoginModal");
   modal.classList.add("show");
+  document.body.style.overflow = "hidden"; // stop scrolling
 
   // Clicking outside closes the modal
   modal.addEventListener("click", function onOutsideClick(e) {
@@ -321,6 +669,7 @@ function showAdminModal() {
 function hideAdminModal() {
   const modal = document.getElementById("adminLoginModal");
   modal.classList.remove("show");
+  document.body.style.overflow = ""; // restore scrolling
 
   // Clear fields
   document.getElementById("adminEmail").value = "";
@@ -505,110 +854,335 @@ function estimateToHours(estimate) {
   return match ? parseFloat(match[0]) : 0;
 }
 
-// ----------------- ADMIN PANEL -----------------
+// ----------------- SEARCH BAR ----------------
+let searchTimeout = null;
+
+document.getElementById("adminSearch")
+  .addEventListener("input", (e) => {
+
+  clearTimeout(searchTimeout);
+
+  searchTimeout = setTimeout(() => {
+    performSearch(e.target.value.trim());
+  }, 400);
+});
+
+async function performSearch(term) {
+
+  if (!term) {
+    openAdmin();
+    return;
+  }
+
+  const bookingsRef = collection(db, "bookings");
+
+  const snapshot = await getDocs(
+    query(
+      bookingsRef,
+      where("clientName", ">=", term),
+      where("clientName", "<=", term + "\uf8ff"),
+      limit(25)
+    )
+  );
+
+  const list = document.getElementById("bookingsList");
+  list.innerHTML = "";
+
+  snapshot.forEach(docSnap => {
+    const booking = docSnap.data();
+    const id = docSnap.id;
+    list.appendChild(createCard(booking, id, "today"));
+  });
+}
+
+// ----------------- ADMIN PANEL ----------------
 async function openAdmin() {
+
   if (!auth.currentUser) {
     showScreen("home");
     return;
   }
 
   showScreen("admin");
+
   const list = document.getElementById("bookingsList");
-  const summary = document.getElementById("dailySummary");
+list.innerHTML = `
+  <div id="revenueSummary"></div>
 
-  // Listening for changes to the "bookings" collection
+  <div class="section">
+    <h3 class="section-header active" onclick="toggleSection(this)">
+      📅 Today <span class="badge" id="todayCount"></span>
+    </h3>
+    <div class="section-content expanded" id="todaySection"></div>
+  </div>
+
+  <div class="section">
+    <h3 class="section-header" onclick="toggleSection(this)">
+      ⏳ Upcoming <span class="badge" id="upcomingCount"></span>
+    </h3>
+    <div class="section-content collapsed" id="upcomingSection"></div>
+  </div>
+
+  <div class="section">
+    <h3 class="section-header" onclick="toggleSection(this)">
+      📁 Past <span class="badge" id="pastCount"></span>
+    </h3>
+    <div class="section-content collapsed" id="pastSection"></div>
+    <div style="text-align:center; margin:15px;">
+      <button id="loadMorePastBtn" class="button">
+        Load More Past
+      </button>
+    </div>
+  </div>
+`;
+
+startAdminListener();
+
+  document
+    .getElementById("loadMorePastBtn")
+    .addEventListener("click", () => {
+      loadPastBookings(false);
+    });
+}
+
+// ----------------- (LOADS TODAY + UPCOMING + ANALYSTICS) ----------------
+function startAdminListener() {
+
+  if (unsubscribeAdmin) unsubscribeAdmin();
+
   const bookingsRef = collection(db, "bookings");
-  const q = query(bookingsRef, orderBy("createdAt", "desc"));
 
-  if (unsubscribeBookings) unsubscribeBookings();
+  unsubscribeAdmin = onSnapshot(
+    query(bookingsRef, orderBy("date", "asc")),
+    (snapshot) => {
 
-  unsubscribeBookings = onSnapshot(q, snapshot => {
-    list.innerHTML = ""; // Clear the current list
-    summary.innerHTML = ""; // Clear the summary
+      const todaySection = document.getElementById("todaySection");
+      const upcomingSection = document.getElementById("upcomingSection");
+      const pastSection = document.getElementById("pastSection");
 
-    const dailyTotals = {};
-    const dailyRevenue = {};
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today to midnight
+      todaySection.innerHTML = "";
+      upcomingSection.innerHTML = "";
+      pastSection.innerHTML = "";
 
-    snapshot.docs.forEach(doc => {
-      const booking = doc.data();
-      const id = doc.id;
-      const dateStr = booking.date || "Unknown";
-      const bookingDate = booking.date ? new Date(booking.date) : today;
-      bookingDate.setHours(0, 0, 0, 0); // Normalize the date
+      let todayCount = 0;
+      let upcomingCount = 0;
+      let pastCount = 0;
 
-      const hours = estimateToHours(booking.timeEstimate || "0");
-      dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + hours;
+      let daily = 0;
+      let monthly = 0;
+      let yearly = 0;
 
-      // Calculate revenue only for pitched bookings
-      if (booking.pitched === "yes") {
-        dailyRevenue[dateStr] = (dailyRevenue[dateStr] || 0) + (booking.price || 0);
-      } else {
-        dailyRevenue[dateStr] = dailyRevenue[dateStr] || 0;
+      let styleTotals = {};
+      let monthlyTotals = {};
+      let yearlyTotals = {};
+
+      const now = new Date();
+      const todayStr = now.toISOString().split("T")[0];
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+
+      snapshot.forEach(docSnap => {
+
+  const b = docSnap.data();
+  const id = docSnap.id;
+
+  const bookingDateTime =
+new Date(`${b.date}T${b.time || "00:00"}`);
+
+  // SECTION LOGIC
+  if (b.date === todayStr) {
+    todaySection.appendChild(createCard(b, id, "today"));
+    todayCount++;
+  }
+  else if (bookingDateTime > now) {
+    upcomingSection.appendChild(createCard(b, id, "upcoming"));
+    upcomingCount++;
+  }
+  else {
+    pastSection.appendChild(createCard(b, id, "past"));
+    pastCount++;
+  }
+
+ // REVENUE LOGIC
+if (b.pitched === true && b.pitchedConfirmedAt) {
+
+  const price = Number(b.price) || 0;
+
+  const bookingDate = new Date(b.date);
+  const confirmedDate = b.pitchedConfirmedAt.toDate();
+
+  // TODAY revenue = only if booking is today
+  if (b.date === todayStr) {
+    daily += price;
+  }
+
+  // MONTH revenue = based on when pitched was confirmed
+  if (
+    confirmedDate.getMonth() === currentMonth &&
+    confirmedDate.getFullYear() === currentYear
+  ) {
+    monthly += price;
+  }
+
+  // YEAR revenue
+  if (confirmedDate.getFullYear() === currentYear) {
+    yearly += price;
+  }
+
+  // STYLE TOTALS
+  styleTotals[b.style] =
+    (styleTotals[b.style] || 0) + price;
+
+  const monthKey =
+    `${confirmedDate.getFullYear()}-${confirmedDate.getMonth()+1}`;
+
+  monthlyTotals[monthKey] =
+    (monthlyTotals[monthKey] || 0) + price;
+
+  const yearKey = confirmedDate.getFullYear();
+
+  yearlyTotals[yearKey] =
+    (yearlyTotals[yearKey] || 0) + price;
+}
+
+}); // ← LOOP ENDS HERE
+
+
+// ✅ UPDATE UI AFTER LOOP
+document.getElementById("todayCount").textContent = todayCount;
+document.getElementById("upcomingCount").textContent = upcomingCount;
+document.getElementById("pastCount").textContent = pastCount;
+
+document.getElementById("todayRevenue").textContent =
+  "R " + daily.toFixed(2);
+
+document.getElementById("monthRevenue").textContent =
+  "R " + monthly.toFixed(2);
+
+document.getElementById("yearRevenue").textContent =
+  "R " + yearly.toFixed(2);
+
+buildCharts(styleTotals, monthlyTotals, yearlyTotals);
+
+    });
+}
+
+function toggleSection(header) {
+  const content = header.nextElementSibling;
+
+  content.classList.toggle("expanded");
+}
+
+async function loadPastBookings(reset = false) {
+
+  if (loadingPast) return;
+  loadingPast = true;
+
+  const pastSection = document.getElementById("pastSection");
+  const bookingsRef = collection(db, "bookings");
+
+  const now = new Date();
+
+  if (reset) {
+    pastSection.innerHTML = "";
+    pastLastDoc = null;
+    document.getElementById("pastCount").textContent = "0";
+  }
+
+  let q;
+
+  if (pastLastDoc && !reset) {
+    q = query(
+      bookingsRef,
+      orderBy("date", "desc"),
+      startAfter(pastLastDoc),
+      limit(PAST_PAGE_SIZE)
+    );
+  } else {
+    q = query(
+      bookingsRef,
+      orderBy("date", "desc"),
+      limit(PAST_PAGE_SIZE)
+    );
+  }
+
+  const snapshot = await getDocs(q);
+
+  if (!snapshot.empty) {
+
+    pastLastDoc = snapshot.docs[snapshot.docs.length - 1];
+
+    let addedCount = 0;
+
+    snapshot.forEach(docSnap => {
+
+      const booking = docSnap.data();
+      const id = docSnap.id;
+
+      const bookingDateTime =
+new Date(`${booking.date}T${booking.time || "00:00"}`);
+
+      if (bookingDateTime < now) {
+
+        pastSection.appendChild(
+          createCard(booking, id, "past")
+        );
+
+        addedCount++;
       }
-
-      // Determine booking status class
-      const statusClass = 
-        booking.status === "Pending" ? "pending" :
-        booking.status === "Accepted" ? "accepted" :
-        booking.status === "Declined" ? "declined" : "pending";
-
-      // Render booking card with pitch options
-      let pitchHTML = "";
-      if (bookingDate <= today) {
-        if (!booking.pitched || booking.pitched === "pending") {
-          pitchHTML = `
-            <div class="pitch-buttons">
-              <button class="button pitch" onclick="markPitched('${id}', 'yes')">Pitched</button>
-              <button class="button nopitch" onclick="markPitched('${id}', 'no')">Didn't Pitch</button>
-            </div>
-          `;
-        } else {
-          pitchHTML = `<p>Pitched: ${booking.pitched}</p>`;
-        }
-      } else {
-        pitchHTML = `<p>Pitched: Pending</p>`;
-      }
-
-      // Create the booking card
-      const card = document.createElement("div");
-      card.className = `booking-card ${statusClass}`;
-      card.innerHTML = `
-        <p><strong>${booking.clientName || "Unknown Client"}</strong></p>
-        <p>${booking.style || "Unknown Style"} – ${booking.length || "Unknown Length"}</p>
-        <p>⏱ ${booking.timeEstimate || "0 hrs"}</p>
-        <p>${dateStr} @ ${booking.time || "Unknown Time"}</p>
-        <p>Status: ${booking.status || "Pending"}</p>
-        <div class="booking-buttons">
-          <div class="status-buttons">
-            <button class="button accept" onclick="updateBookingStatus('${id}','Accepted')">Accept</button>
-            <button class="button decline" onclick="updateBookingStatus('${id}','Declined')">Decline</button>
-          </div>
-          ${pitchHTML}
-          <div class="delete-button">
-            <button class="button delete" onclick="deleteBooking('${id}')">Delete</button>
-          </div>
-        </div>
-      `;
-      list.appendChild(card);
     });
 
-    // Render daily summary
-    for (const date in dailyTotals) {
-      const div = document.createElement("div");
-      div.className = "style-card";
-      div.innerHTML = `
-        <strong>${date}</strong><br>
-        ⏱ Work: ${dailyTotals[date]} hrs<br>
-        💰 Revenue: R${dailyRevenue[date]}<br>
-        <button class="button clear" onclick="clearBookingsForDate('${date}')">Clear</button>
-      `;
-      summary.appendChild(div);
-    }
-  });
+    const badge = document.getElementById("pastCount");
+    badge.textContent =
+      parseInt(badge.textContent || "0") + addedCount;
+  }
+
+  loadingPast = false;
+} 
+
+function createCard(booking, id, sectionType) {
+
+  const card = document.createElement("div");
+  card.className = "booking-card";
+
+  let pitchedButtons = "";
+
+  if (
+    (sectionType === "today" || sectionType === "past") &&
+    booking.pitched === undefined
+  ) {
+
+    pitchedButtons = `
+      <div class="booking-buttons">
+        <button class="button accept"
+          onclick="confirmPitched('${id}', true, this)">
+          <span class="btn-text">✅ Pitched</span>
+          <span class="spinner" style="display:none;"></span>
+        </button>
+
+        <button class="button decline"
+          onclick="confirmPitched('${id}', false, this)">
+          <span class="btn-text">❌ Not Pitched</span>
+          <span class="spinner" style="display:none;"></span>
+        </button>
+      </div>
+    `;
+  }
+
+  card.innerHTML = `
+    <p><strong>${booking.clientName || "Unknown Client"}</strong></p>
+    <p>${booking.style || ""} – ${booking.length || ""}</p>
+<p>📞 ${booking.clientPhone || "No phone"}</p>
+<p>✉️ ${booking.clientEmail || "No email"}</p>
+    <p>${booking.date} @ ${booking.time || "00:00"}</p>
+    <p>Status: ${booking.status || "Pending"}</p>
+    ${pitchedButtons}
+  `;
+
+  return card;
 }
-  
+
+//---- MARK PITCHED -----
 async function markPitched(id, value) {
   try {
     const fn = httpsCallable(functions, "markPitched");
@@ -617,6 +1191,110 @@ async function markPitched(id, value) {
     console.error(err);
   }
 }
+
+//---- DASHBOARD ANALYTICS + CHARTS -----
+function buildCharts(styleTotals, monthlyTotals, yearlyTotals) {
+
+  // Destroy safely
+  ["revenueChart", "styleChart", "yearChart"].forEach(chartName => {
+    if (window[chartName] && typeof window[chartName].destroy === "function") {
+      window[chartName].destroy();
+    }
+  });
+
+  const revenueCtx = document.getElementById("revenueChart").getContext("2d");
+
+  window.revenueChart = new Chart(revenueCtx, {
+    type: "bar",
+    data: {
+      labels: Object.keys(monthlyTotals),
+      datasets: [{
+        label: "Revenue",
+        data: Object.values(monthlyTotals),
+        backgroundColor: "#c59d5f"
+      }]
+    }
+  });
+
+}
+
+//------ REAL BOOKING HEATMAP ------
+function buildHeatmap(snapshot) {
+
+  const calendar = document.getElementById("calendar");
+  calendar.innerHTML = "";
+
+  const counts = {};
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+
+  snapshot.forEach(doc => {
+    const b = doc.data();
+ if (!b.date || b.pitched !== true) return;
+
+    const d = new Date(b.date);
+
+    if (d.getMonth() === month &&
+        d.getFullYear() === year) {
+
+      const day = d.getDate();
+      counts[day] = (counts[day] || 0) + 1;
+    }
+  });
+
+  const daysInMonth =
+    new Date(year, month + 1, 0).getDate();
+
+  for (let day = 1; day <= daysInMonth; day++) {
+
+    const cell = document.createElement("div");
+    cell.className = "heat-cell";
+
+    const count = counts[day] || 0;
+
+    cell.textContent = day;
+
+    // intensity color
+    const intensity = Math.min(count * 40, 200);
+    cell.style.backgroundColor =
+      `rgb(${255-intensity}, ${255-intensity}, 255)`;
+
+    calendar.appendChild(cell);
+  }
+}
+
+async function confirmPitched(id, value, btn) {
+
+  const spinner = btn?.querySelector(".spinner");
+  const text = btn?.querySelector(".btn-text");
+
+  if (spinner && text) {
+    spinner.style.display = "inline-block";
+    text.style.display = "none";
+    btn.disabled = true;
+  }
+
+  try {
+
+    await updateDoc(doc(db, "bookings", id), {
+      pitched: value,
+      pitchedConfirmedAt: value ? new Date() : null,
+      paymentStatus: value ? "Fully Paid" : "Pending"
+    });
+
+  } catch (err) {
+    alert("❌ Failed: " + err.message);
+  } finally {
+    if (spinner && text) {
+      spinner.style.display = "none";
+      text.style.display = "inline";
+      btn.disabled = false;
+    }
+  }
+}
+
+window.confirmPitched = confirmPitched;
 
 async function updateBookingStatus(id, status) {
   try {
@@ -628,6 +1306,28 @@ async function updateBookingStatus(id, status) {
   }
 }
   
+window.toggleSection = function(header) {
+
+  const content = header.nextElementSibling;
+
+  if (content.classList.contains("expanded")) {
+
+    content.style.maxHeight = content.scrollHeight + "px";
+
+    requestAnimationFrame(() => {
+      content.style.maxHeight = "0px";
+    });
+
+    content.classList.remove("expanded");
+
+  } else {
+
+    content.classList.add("expanded");
+    content.style.maxHeight = content.scrollHeight + "px";
+
+  }
+};
+
 async function deleteBooking(id) {
   if (!confirm("Delete this booking?")) return;
 
@@ -686,7 +1386,13 @@ document.getElementById("clearAllBtn").onclick = async function () {
   }
 };
 
+document.getElementById("loadMoreBtn")
+  .addEventListener("click", () => {
+    loadPastBookings(false);
+});
+
 // 🔥 Expose functions to HTML (because we use type="module")
+window.toggleSection = toggleSection;
 window.showScreen = showScreen;
 window.closeAdminLogin = hideAdminModal;
 window.toggleAdminPassword = toggleAdminPassword;
@@ -699,8 +1405,7 @@ window.updateBookingStatus = updateBookingStatus;
 window.deleteBooking = deleteBooking;
 window.clearBookingsForDate = clearBookingsForDate;
   });
-        
+ 
 </script>
-
 </body>
 </html>
