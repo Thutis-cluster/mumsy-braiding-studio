@@ -198,8 +198,8 @@ input:focus{border-color:#ffd700;}
   margin-bottom:15px;
   border-radius:12px;
   box-shadow:0 6px 15px rgba(0,0,0,0.05);
-  transform:translateX(-30px);
-  opacity:0;
+  transform:none;
+  opacity:1;
   animation:slideIn 0.4s ease forwards;
 }
 
@@ -217,6 +217,28 @@ input:focus{border-color:#ffd700;}
 .booking-buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;}
 .status-buttons button{flex:1;}
 .pitch-buttons button{margin-right:5px;}
+
+#pastSection {
+  max-height: 450px; /* adjust to fit your screen */
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+
+#pastCards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.past-loader{
+  text-align:center;
+  padding:12px;
+  color:#666;
+  display:none;
+  font-size:14px;
+}
 
 /* --- DAILY SUMMARY --- */
 .style-card{background:#fff8f0;padding:15px;margin-bottom:12px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.05);}
@@ -257,7 +279,8 @@ input:focus{border-color:#ffd700;}
 }
 
 .section-content.expanded {
-  max-height: 2000px; /* big enough to fit content */
+  max-height: 60vh; /* big enough to fit content */
+  overflow-y:auto;
 }
 
 body.dark .section-header {
@@ -332,6 +355,12 @@ body.dark .section-header {
   font-size:1.7rem;
   font-weight:700;
   color:#111;
+}
+
+.dashboard-header{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:20px;
 }
 
 body.dark .kpi-card{
@@ -412,17 +441,15 @@ canvas {
 
 .charts-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  grid-template-columns:2fr 1fr;
   gap:25px;
-  margin-top:20px;
 }
 
 .chart-card{
-  backdrop-filter: blur(15px);
-  background:rgba(255,255,255,0.5);
-  border-radius:20px;
-  padding:20px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.08);
+  padding:25px;
+  border-radius:16px;
+  background:white;
+  box-shadow:0 8px 25px rgba(0,0,0,0.08);
 }
 
 .chart-card h4{
@@ -441,13 +468,7 @@ canvas {
 .booking-card{
   position:relative;
   z-index:0;
-}
-
-#calendar {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
-  margin-top: 20px;
+  margin-bottom:10px;
 }
 
 #monthlyStats{
@@ -468,11 +489,114 @@ canvas {
   to { transform: rotate(360deg); }
 }
 
+.admin-layout{
+  display:grid;
+  grid-template-columns:260px 1fr;
+  min-height:100vh;
+}
+
+/* SIDEBAR */
+
+.sidebar{
+  background:#111;
+  color:white;
+  padding:30px 20px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+
+.logo{
+  font-family:'Playfair Display',serif;
+  color:#ffd700;
+  text-align:center;
+  margin-bottom:30px;
+}
+
+.nav-btn{
+  width:100%;
+  padding:12px;
+  border:none;
+  background:none;
+  color:white;
+  text-align:left;
+  border-radius:8px;
+  margin-bottom:10px;
+  cursor:pointer;
+  transition:0.2s;
+}
+
+.nav-btn:hover{
+  background:#222;
+}
+
+.nav-btn.active{
+  background:#b88c4a;
+}
+
+.sidebar-footer{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+/* MAIN AREA */
+
+.admin-main{
+  padding:40px;
+  display:flex;
+  flex-direction:column;
+  gap:30px;
+}
+
+.dashboard-topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.dashboard-topbar input{
+  padding:10px 15px;
+  border-radius:8px;
+  border:1px solid #ddd;
+  width:250px;
+}
+
+.live-notification{
+  position:fixed;
+  top:20px;
+  right:20px;
+  background:#111;
+  color:white;
+  padding:15px 20px;
+  border-radius:10px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.3);
+  animation:slideIn 0.4s ease;
+  z-index:9999;
+}
+
+@keyframes slideIn{
+  from{transform:translateX(120%);}
+  to{transform:translateX(0);}
+}
+
+.client-row{
+display:flex;
+justify-content:space-between;
+padding:10px;
+border-bottom:1px solid #eee;
+}
+
 </style>
 
 <!-- =================== FIREBASE + CONFETTI + SOUND =================== -->
+
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <audio id="bookingSound" src="ding.mp3" preload="auto"></audio>
+//--- CALENDER -----
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
 
 </head>
 <body>
@@ -508,8 +632,28 @@ canvas {
 
 <!-- ==================== ADMIN PANEL ==================== -->
 <div id="admin" class="screen">
-<button class="button" id="darkModeToggle">🌙 Dark Mode</button>
-  <button class="button decline" id="logoutBtn">🚪 Logout</button>
+<div class="admin-layout">
+
+  <aside class="sidebar">
+
+    <h2 class="logo">Mumsy</h2>
+
+    <nav>
+      <button class="nav-btn active">📊 Dashboard</button>
+      <button class="nav-btn">📅 Calendar</button>
+      <button class="nav-btn">💇 Bookings</button>
+      <button class="nav-btn">📈 Analytics</button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button id="darkModeToggle" class="button">🌙 Mode</button>
+      <button id="logoutBtn" class="button decline">🚪 Logout</button>
+    </div>
+
+  </aside>
+
+  <main class="admin-main">
+
 <input 
   type="text" 
   id="adminSearch"
@@ -518,6 +662,11 @@ canvas {
 >
   <h2>💼 Owner Admin Panel</h2>
 <div id="dashboardHeader" class="dashboard-header">
+<div class="dashboard-topbar">
+
+  <h1>Dashboard</h1>
+
+</div>
   <div class="kpi-card">
     <h5>💰 Today</h5>
     <p id="todayRevenue" class="kpi-value">R 0.00</p>
@@ -544,12 +693,13 @@ canvas {
   </div>
 </div>
 
- <div id="bookingsList">
+<div class="chart-card">
+<h4>📋 Recent Bookings</h4>
+<div id="bookingsList">
     <div id="dailySummary"></div>
     <p>Loading bookings...</p>
   </div>
-<div style="text-align:center; margin:20px;">
-  <button id="loadMoreBtn" class="button">Load More</button>
+</div>
 </div>
 
 <!-- CALENDAR -->
@@ -573,9 +723,18 @@ canvas {
     <canvas id="yearlyChart"></canvas>
   </div>
 </div>
-</div>
 
-<button id="clearAllBtn" class="button danger">Clear All Bookings</button>
+<div class="chart-card">
+<h4>🏆 Top Clients</h4>
+<div id="topClients"></div>
+</div>
+<div class="chart-card">
+<h4>📊 Booking Funnel</h4>
+<canvas id="funnelChart"></canvas>
+</div>
+</main>
+  <button id="clearAllBtn" class="button danger">Clear All Bookings</button>
+</div>
 
 <script type="module">
 
@@ -617,8 +776,14 @@ let styleChartInstance = null;
 let revenueChartInstance = null;
 let isSubmitting = false;
 let pastLastDoc = null;
+let searchLastDoc = null;
+let searchLoading = false;
+let searchNoMore = false;
+const SEARCH_PAGE_SIZE = 25;
 let revenueChart, styleChart, yearlyChart;
 let loadingPast = false;
+let noMorePast = false;
+let funnelChart;
 const PAST_PAGE_SIZE = 25;
 
 // ------------------ Show Screen ------------------
@@ -785,12 +950,17 @@ onAuthStateChanged(auth, async (user) => {
   const lastBooking = sessionStorage.getItem("lastBookingReference");
 
   // 🔐 If admin is logged in → ALWAYS go to admin only
-  if (user) {
-    try {
-      const verifyFn = httpsCallable(functions, "verifyAdmin");
-      await verifyFn();
+if (user) {
+  try {
 
-      openAdmin();
+    // Wait until token fully loads
+    await user.getIdToken(true);
+
+    const verifyFn = httpsCallable(functions, "verifyAdmin");
+    await verifyFn();
+
+    openAdmin();
+
       return; // STOP here. Never load confirmation.
     } catch (err) {
       await signOut(auth);
@@ -867,33 +1037,163 @@ document.getElementById("adminSearch")
   }, 400);
 });
 
-async function performSearch(term) {
+async function performSearch(term, reset = true) {
+if (reset) {
+  searchNoMore = false;
+  searchLastDoc = null;
+}
 
   if (!term) {
     openAdmin();
     return;
   }
 
+  if (searchLoading || searchNoMore) return;
+
+  searchLoading = true;
+
   const bookingsRef = collection(db, "bookings");
 
-  const snapshot = await getDocs(
-    query(
-      bookingsRef,
-      where("clientName", ">=", term),
-      where("clientName", "<=", term + "\uf8ff"),
-      limit(25)
-    )
-  );
-
   const list = document.getElementById("bookingsList");
-  list.innerHTML = "";
+
+  if (reset) {
+
+list.innerHTML = `
+
+<div class="section">
+
+<h3 class="section-header active">
+🔎 Search Results <span class="badge" id="searchCount">0</span>
+</h3>
+
+<div class="section-content expanded" id="searchSection">
+
+<div id="searchResults"></div>
+
+<div id="searchLoader" class="past-loader">
+Loading...
+</div>
+
+</div>
+
+</div>
+`;
+
+    searchLastDoc = null;
+    searchNoMore = false;
+  }
+
+  let q;
+
+  if (searchLastDoc && !reset) {
+
+    q = query(
+      bookingsRef,
+      orderBy("date", "desc"),
+      startAfter(searchLastDoc),
+      limit(SEARCH_PAGE_SIZE)
+    );
+
+  } else {
+
+    q = query(
+      bookingsRef,
+      orderBy("date", "desc"),
+      limit(SEARCH_PAGE_SIZE)
+    );
+
+  }
+
+  const snapshot = await getDocs(q);
+
+  if (snapshot.empty) {
+    searchNoMore = true;
+    document.getElementById("searchLoader").innerText = "No more results";
+    searchLoading = false;
+    return;
+  }
+
+  searchLastDoc = snapshot.docs[snapshot.docs.length - 1];
+
+  const results = document.getElementById("searchResults");
+
+  const termLower = term.toLowerCase();
+
+  let added = 0;
 
   snapshot.forEach(docSnap => {
+
     const booking = docSnap.data();
     const id = docSnap.id;
-    list.appendChild(createCard(booking, id, "today"));
+
+    const name = (booking.clientName || "").toLowerCase();
+    const phone = (booking.clientPhone || "").toLowerCase();
+    const email = (booking.clientEmail || "").toLowerCase();
+    const date = (booking.date || "").toLowerCase();
+
+    if (
+      name.includes(termLower) ||
+      phone.includes(termLower) ||
+      email.includes(termLower) ||
+      date.includes(termLower)
+    ) {
+
+      results.appendChild(
+        createCard(booking, id, "today")
+      );
+
+      added++;
+    }
+
   });
+
+const badge = document.getElementById("searchCount");
+
+if (badge) {
+  const current = Number(badge.textContent) || 0;
+  badge.textContent = current + added;
 }
+
+  if (added === 0) {
+    searchNoMore = true;
+    document.getElementById("searchLoader").innerText = "No results";
+  }
+
+  searchLoading = false;
+}
+
+document.addEventListener("input", () => {
+
+const searchSection = document.getElementById("searchSection");
+if(!searchSection) return;
+
+searchSection.addEventListener("scroll", () => {
+
+if (searchLoading || searchNoMore) return;
+
+if(
+searchSection.scrollTop + searchSection.clientHeight >=
+searchSection.scrollHeight - 80
+){
+
+const term =
+document.getElementById("adminSearch").value.trim();
+
+performSearch(term,false);
+
+}
+
+});
+
+});
+
+window.toggleSection = function(header) {
+
+  const content = header.nextElementSibling;
+
+  content.classList.toggle("expanded");
+
+};
 
 // ----------------- ADMIN PANEL ----------------
 async function openAdmin() {
@@ -923,32 +1223,125 @@ list.innerHTML = `
     <div class="section-content collapsed" id="upcomingSection"></div>
   </div>
 
-  <div class="section">
-    <h3 class="section-header" onclick="toggleSection(this)">
-      📁 Past <span class="badge" id="pastCount"></span>
-    </h3>
-    <div class="section-content collapsed" id="pastSection"></div>
-    <div style="text-align:center; margin:15px;">
-      <button id="loadMorePastBtn" class="button">
-        Load More Past
-      </button>
+<div class="section">
+  <h3 class="section-header" onclick="toggleSection(this)">
+    📁 Past <span class="badge" id="pastCount"></span>
+  </h3>
+
+  <div class="section-content expanded" id="pastSection">
+
+    <div id="pastCards"></div>
+
+    <div id="pastLoader" class="past-loader">
+      Loading more bookings...
     </div>
+
   </div>
+</div>
 `;
 
 startAdminListener();
+loadPastBookings(true);
 
-  document
-    .getElementById("loadMorePastBtn")
-    .addEventListener("click", () => {
-      loadPastBookings(false);
-    });
+const pastScroll = document.getElementById("pastSection");
+
+pastScroll.addEventListener("scroll", () => {
+
+  if (loadingPast || noMorePast) return;
+
+if (
+  pastScroll.scrollTop + pastScroll.clientHeight >=
+  pastScroll.scrollHeight - 80
+) {
+    loadPastBookings(false);
+  }
+
+});
+}
+
+//------------ REVENUE LOGIC ------
+function calculateRevenue(snapshot) {
+
+  const now = new Date();
+
+const today = new Date();
+const todayStr =
+  today.getFullYear() +
+  "-" +
+  String(today.getMonth()+1).padStart(2,"0") +
+  "-" +
+  String(today.getDate()).padStart(2,"0");
+
+  const year = now.getFullYear();
+  const month = now.getMonth();
+
+  let daily = 0, monthly = 0, yearly = 0;
+  const styleTotals = {};
+  const monthlyTotals = {};
+  const yearlyTotals = {};
+
+  snapshot.forEach(doc => {
+
+    const b = doc.data();
+    if (!b.pitched || !b.pitchedConfirmedAt) return;
+
+    const price = Number(b.price) || 0;
+    const confirmed = b.pitchedConfirmedAt.toDate();
+
+    // TODAY
+    if (b.date === todayStr) daily += price;
+
+    // MONTH
+    if (confirmed.getFullYear() === year &&
+        confirmed.getMonth() === month) {
+      monthly += price;
+    }
+
+    // YEAR
+    if (confirmed.getFullYear() === year) {
+      yearly += price;
+    }
+
+    // STYLE
+if (b.style && b.style.trim() !== "") {
+
+  const style = b.style.trim();
+
+  styleTotals[style] =
+    (styleTotals[style] || 0) + price;
+
+}
+
+    // MONTH CHART
+    const mKey =
+      `${confirmed.getFullYear()}-${confirmed.getMonth()+1}`;
+    monthlyTotals[mKey] =
+      (monthlyTotals[mKey] || 0) + price;
+
+    // YEAR CHART
+    const yKey = confirmed.getFullYear();
+    yearlyTotals[yKey] =
+      (yearlyTotals[yKey] || 0) + price;
+
+  });
+
+// MONTHLY TARGET PROGRESS
+const MONTHLY_TARGET = 3000;
+
+let growthRate = (monthly / MONTHLY_TARGET) * 100;
+
+if (growthRate > 100) growthRate = 100;
+
+  return { daily, monthly, yearly,   growthRate, styleTotals, monthlyTotals, yearlyTotals };
 }
 
 // ----------------- (LOADS TODAY + UPCOMING + ANALYSTICS) ----------------
 function startAdminListener() {
 
-  if (unsubscribeAdmin) unsubscribeAdmin();
+  if (unsubscribeAdmin) {
+    unsubscribeAdmin();
+    unsubscribeAdmin = null;
+  }
 
   const bookingsRef = collection(db, "bookings");
 
@@ -958,15 +1351,15 @@ function startAdminListener() {
 
       const todaySection = document.getElementById("todaySection");
       const upcomingSection = document.getElementById("upcomingSection");
-      const pastSection = document.getElementById("pastSection");
+      const pastSection = document.getElementById("pastCards");
 
       todaySection.innerHTML = "";
       upcomingSection.innerHTML = "";
-      pastSection.innerHTML = "";
+    // do nothing for past bookings (handled by pagination)
 
       let todayCount = 0;
       let upcomingCount = 0;
-      let pastCount = 0;
+      let pastCount = document.querySelectorAll("#pastCards .booking-card").length;
 
       let daily = 0;
       let monthly = 0;
@@ -977,142 +1370,153 @@ function startAdminListener() {
       let yearlyTotals = {};
 
       const now = new Date();
-      const todayStr = now.toISOString().split("T")[0];
+const today = new Date();
+const todayStr =
+  today.getFullYear() +
+  "-" +
+  String(today.getMonth()+1).padStart(2,"0") +
+  "-" +
+  String(today.getDate()).padStart(2,"0");
       const currentYear = now.getFullYear();
       const currentMonth = now.getMonth();
 
-      snapshot.forEach(docSnap => {
+let previousCount = window.lastBookingCount || 0;
+let currentCount = snapshot.size;
 
-  const b = docSnap.data();
-  const id = docSnap.id;
+if(currentCount > previousCount){
 
-  const bookingDateTime =
-new Date(`${b.date}T${b.time || "00:00"}`);
+  showNotification("New booking received!");
 
-  // SECTION LOGIC
-  if (b.date === todayStr) {
-    todaySection.appendChild(createCard(b, id, "today"));
-    todayCount++;
-  }
-  else if (bookingDateTime > now) {
-    upcomingSection.appendChild(createCard(b, id, "upcoming"));
-    upcomingCount++;
-  }
-  else {
-    pastSection.appendChild(createCard(b, id, "past"));
-    pastCount++;
-  }
-
- // REVENUE LOGIC
-if (b.pitched === true && b.pitchedConfirmedAt) {
-
-  const price = Number(b.price) || 0;
-
-  const bookingDate = new Date(b.date);
-  const confirmedDate = b.pitchedConfirmedAt.toDate();
-
-  // TODAY revenue = only if booking is today
-  if (b.date === todayStr) {
-    daily += price;
-  }
-
-  // MONTH revenue = based on when pitched was confirmed
-  if (
-    confirmedDate.getMonth() === currentMonth &&
-    confirmedDate.getFullYear() === currentYear
-  ) {
-    monthly += price;
-  }
-
-  // YEAR revenue
-  if (confirmedDate.getFullYear() === currentYear) {
-    yearly += price;
-  }
-
-  // STYLE TOTALS
-  styleTotals[b.style] =
-    (styleTotals[b.style] || 0) + price;
-
-  const monthKey =
-    `${confirmedDate.getFullYear()}-${confirmedDate.getMonth()+1}`;
-
-  monthlyTotals[monthKey] =
-    (monthlyTotals[monthKey] || 0) + price;
-
-  const yearKey = confirmedDate.getFullYear();
-
-  yearlyTotals[yearKey] =
-    (yearlyTotals[yearKey] || 0) + price;
 }
 
-}); // ← LOOP ENDS HERE
+window.lastBookingCount = currentCount;
+window.lastSnapshot = snapshot;
 
+snapshot.forEach(docSnap => {
+
+  const booking = docSnap.data();
+  const id = docSnap.id;
+
+  const bookingDateTime = new Date(
+    booking.date + " " + (booking.time || "00:00")
+  );
+
+  if (booking.date === todayStr) {
+
+    todaySection.appendChild(
+      createCard(booking, id, "today")
+    );
+    todayCount++;
+
+  }
+  else if (bookingDateTime > now) {
+
+    upcomingSection.appendChild(
+      createCard(booking, id, "upcoming")
+    );
+    upcomingCount++;
+
+  }
+
+}); // ← LOOP ENDS HERE
 
 // ✅ UPDATE UI AFTER LOOP
 document.getElementById("todayCount").textContent = todayCount;
 document.getElementById("upcomingCount").textContent = upcomingCount;
 document.getElementById("pastCount").textContent = pastCount;
 
-document.getElementById("todayRevenue").textContent =
-  "R " + daily.toFixed(2);
+const revenue = calculateRevenue(snapshot);
 
-document.getElementById("monthRevenue").textContent =
-  "R " + monthly.toFixed(2);
+// MOST PROFITABLE STYLE
+const styles = Object.entries(revenue.styleTotals);
 
-document.getElementById("yearRevenue").textContent =
-  "R " + yearly.toFixed(2);
+if (styles.length > 0) {
 
-buildCharts(styleTotals, monthlyTotals, yearlyTotals);
+  styles.sort((a,b)=>b[1]-a[1]);
 
-    });
+  document.getElementById("topStyle").textContent =
+    styles[0][0] + " (R " + styles[0][1] + ")";
+}
+else{
+  document.getElementById("topStyle").textContent = "—";
 }
 
-function toggleSection(header) {
-  const content = header.nextElementSibling;
+document.getElementById("todayRevenue").textContent =
+  "R " + revenue.daily.toFixed(2);
 
-  content.classList.toggle("expanded");
+document.getElementById("monthRevenue").textContent =
+  "R " + revenue.monthly.toFixed(2);
+
+document.getElementById("yearRevenue").textContent =
+  "R " + revenue.yearly.toFixed(2);
+
+document.getElementById("growthRate").textContent =
+  revenue.growthRate.toFixed(1) + "%";
+
+buildCharts(
+  revenue.styleTotals,
+  revenue.monthlyTotals,
+  revenue.yearlyTotals
+);
+
+buildCalendar(snapshot);
+buildClientValue(snapshot);
+buildFunnel(snapshot);
+    });
 }
 
 async function loadPastBookings(reset = false) {
 
-  if (loadingPast) return;
+  if (loadingPast || noMorePast) return;
+
   loadingPast = true;
 
-  const pastSection = document.getElementById("pastSection");
-  const bookingsRef = collection(db, "bookings");
+  const loader = document.getElementById("pastLoader");
+  const pastSection = document.getElementById("pastCards");
 
+if(loader) loader.style.display = "block";
+
+  const bookingsRef = collection(db, "bookings");
   const now = new Date();
 
   if (reset) {
     pastSection.innerHTML = "";
     pastLastDoc = null;
-    document.getElementById("pastCount").textContent = "0";
+    noMorePast = false;
   }
 
   let q;
 
   if (pastLastDoc && !reset) {
+
     q = query(
       bookingsRef,
       orderBy("date", "desc"),
       startAfter(pastLastDoc),
       limit(PAST_PAGE_SIZE)
     );
+
   } else {
+
     q = query(
       bookingsRef,
       orderBy("date", "desc"),
       limit(PAST_PAGE_SIZE)
     );
+
   }
 
   const snapshot = await getDocs(q);
 
-  if (!snapshot.empty) {
+  if (snapshot.empty) {
+
+    noMorePast = true;
+if(loader) loader.innerText = "No more bookings";
+  } else {
 
     pastLastDoc = snapshot.docs[snapshot.docs.length - 1];
 
-    let addedCount = 0;
+let added = 0;
 
     snapshot.forEach(docSnap => {
 
@@ -1120,30 +1524,43 @@ async function loadPastBookings(reset = false) {
       const id = docSnap.id;
 
       const bookingDateTime =
-new Date(`${booking.date}T${booking.time || "00:00"}`);
+        new Date(booking.date + " " + (booking.time || "00:00"));
 
       if (bookingDateTime < now) {
-
-        pastSection.appendChild(
+const pastCards = document.getElementById("pastCards");
+        pastCards.appendChild(
           createCard(booking, id, "past")
         );
 
-        addedCount++;
+added++;
+
       }
+
     });
 
-    const badge = document.getElementById("pastCount");
-    badge.textContent =
-      parseInt(badge.textContent || "0") + addedCount;
+if (added === 0) {
+  noMorePast = true;
+  if(loader) loader.innerText = "No more bookings";
+}
   }
 
+if(loader) loader.style.display = "none";
+
+const pastCards = document.getElementById("pastCards");
+
+if (pastCards) {
+  document.getElementById("pastCount").textContent =
+    pastCards.children.length;
+}
+
   loadingPast = false;
-} 
+}
 
 function createCard(booking, id, sectionType) {
 
   const card = document.createElement("div");
   card.className = "booking-card";
+card.dataset.id = id;
 
   let pitchedButtons = "";
 
@@ -1182,6 +1599,24 @@ function createCard(booking, id, sectionType) {
   return card;
 }
 
+function showNotification(text){
+
+  const note = document.createElement("div");
+  note.className = "live-notification";
+
+  note.innerHTML = `
+  🔔 ${text}
+  `;
+
+  document.body.appendChild(note);
+
+  setTimeout(()=>{
+    note.remove();
+  },4000);
+
+}
+
+
 //---- MARK PITCHED -----
 async function markPitched(id, value) {
   try {
@@ -1192,17 +1627,140 @@ async function markPitched(id, value) {
   }
 }
 
+//---- CLIENT VALUE-----
+function buildClientValue(snapshot){
+
+  const totals = {};
+
+  snapshot.forEach(doc => {
+
+    const b = doc.data();
+
+    if(!b.pitched) return;
+
+    const email = b.clientEmail || "Unknown";
+
+    const price = Number(b.price) || 0;
+
+    totals[email] = (totals[email] || 0) + price;
+
+  });
+
+  const sorted =
+    Object.entries(totals)
+    .sort((a,b)=>b[1]-a[1]);
+
+  window.clientData = sorted;
+
+  renderTopClients(window.clientData, clientPage);
+
+}
+
+let clientPage = 0;
+const CLIENT_PAGE_SIZE = 5;
+
+function renderTopClients(data, page){
+
+  const container = document.getElementById("topClients");
+
+  const start = page * CLIENT_PAGE_SIZE;
+  const end = start + CLIENT_PAGE_SIZE;
+
+  const slice = data.slice(start,end);
+
+  container.innerHTML = "";
+
+  slice.forEach(([email,total]) => {
+
+    const row = document.createElement("div");
+    row.className="client-row";
+
+row.innerHTML = `
+  <span class="client-email">${email}</span>
+  <strong class="client-value">R ${total.toFixed(2)}</strong>
+`;
+
+    container.appendChild(row);
+
+  });
+
+  const nav = document.createElement("div");
+  nav.className = "client-pagination";
+
+  nav.innerHTML = `
+    <button onclick="changeClientPage(-1)">⬅️</button>
+    <button onclick="changeClientPage(1)">➡️</button>
+  `;
+
+  container.appendChild(nav);
+
+}
+
+window.changeClientPage = function(dir){
+
+  clientPage += dir;
+
+  if(clientPage < 0) clientPage = 0;
+
+  const maxPage =
+    Math.ceil(window.clientData.length / CLIENT_PAGE_SIZE) - 1;
+
+  if(clientPage > maxPage) clientPage = maxPage;
+
+  renderTopClients(window.clientData, clientPage);
+
+}
+
+//---- FUNNEL -----
+function buildFunnel(snapshot){
+
+let total=0, pitched=0, completed=0;
+
+snapshot.forEach(doc=>{
+  const b=doc.data();
+  total++;
+  if(b.pitched) pitched++;
+  if(b.status==="Completed") completed++;
+});
+
+if (funnelChart) {
+  funnelChart.destroy();
+}
+
+const ctx=document
+.getElementById("funnelChart")
+.getContext("2d");
+
+funnelChart = new Chart(ctx,{
+type:"bar",
+data:{
+labels:["Bookings","Pitched","Completed"],
+datasets:[{
+data:[total,pitched,completed],
+backgroundColor:["#888","#c59d5f","#3cb371"]
+}]
+}
+});
+}
+
 //---- DASHBOARD ANALYTICS + CHARTS -----
 function buildCharts(styleTotals, monthlyTotals, yearlyTotals) {
 
-  // Destroy safely
-  ["revenueChart", "styleChart", "yearChart"].forEach(chartName => {
-    if (window[chartName] && typeof window[chartName].destroy === "function") {
-      window[chartName].destroy();
-    }
-  });
+ if (window.revenueChart && typeof window.revenueChart.destroy === "function") {
+  window.revenueChart.destroy();
+}
 
-  const revenueCtx = document.getElementById("revenueChart").getContext("2d");
+if (window.styleChart && typeof window.styleChart.destroy === "function") {
+  window.styleChart.destroy();
+}
+
+if (window.yearlyChart && typeof window.yearlyChart.destroy === "function") {
+  window.yearlyChart.destroy();
+}
+
+  // REVENUE CHART
+  const revenueCtx =
+    document.getElementById("revenueChart").getContext("2d");
 
   window.revenueChart = new Chart(revenueCtx, {
     type: "bar",
@@ -1216,52 +1774,96 @@ function buildCharts(styleTotals, monthlyTotals, yearlyTotals) {
     }
   });
 
-}
+  // STYLE CHART
+  const styleCtx =
+    document.getElementById("styleChart").getContext("2d");
 
-//------ REAL BOOKING HEATMAP ------
-function buildHeatmap(snapshot) {
-
-  const calendar = document.getElementById("calendar");
-  calendar.innerHTML = "";
-
-  const counts = {};
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-
-  snapshot.forEach(doc => {
-    const b = doc.data();
- if (!b.date || b.pitched !== true) return;
-
-    const d = new Date(b.date);
-
-    if (d.getMonth() === month &&
-        d.getFullYear() === year) {
-
-      const day = d.getDate();
-      counts[day] = (counts[day] || 0) + 1;
+  window.styleChart = new Chart(styleCtx, {
+    type: "pie",
+    data: {
+      labels: Object.keys(styleTotals),
+      datasets: [{
+        data: Object.values(styleTotals),
+        backgroundColor: [
+          "#c59d5f",
+          "#8a6d3b",
+          "#e0b973",
+          "#d4af37"
+        ]
+      }]
     }
   });
 
-  const daysInMonth =
-    new Date(year, month + 1, 0).getDate();
+  // YEARLY CHART
+  const yearlyCtx =
+    document.getElementById("yearlyChart").getContext("2d");
 
-  for (let day = 1; day <= daysInMonth; day++) {
+  window.yearlyChart = new Chart(yearlyCtx, {
+    type: "line",
+    data: {
+      labels: Object.keys(yearlyTotals),
+      datasets: [{
+        label: "Year Revenue",
+        data: Object.values(yearlyTotals),
+        borderColor: "#c59d5f",
+        fill: false
+      }]
+    }
+  });
+}
 
-    const cell = document.createElement("div");
-    cell.className = "heat-cell";
+//------ REAL BOOKING HEATMAP ------
+function buildCalendar(snapshot){
 
-    const count = counts[day] || 0;
+const calendarEl = document.getElementById("calendar");
 
-    cell.textContent = day;
+const events = [];
 
-    // intensity color
-    const intensity = Math.min(count * 40, 200);
-    cell.style.backgroundColor =
-      `rgb(${255-intensity}, ${255-intensity}, 255)`;
+snapshot.forEach(doc => {
 
-    calendar.appendChild(cell);
+  const b = doc.data();
+
+  events.push({
+    id: doc.id,
+    title: b.clientName + " – " + b.style,
+    start: b.date + "T" + (b.time || "09:00"),
+  });
+
+});
+
+const calendar = new FullCalendar.Calendar(calendarEl, {
+
+  initialView: "dayGridMonth",
+
+  editable: true,
+  selectable: true,
+
+  events: events,
+
+  dateClick(info){
+    alert("Add booking for " + info.dateStr);
+  },
+
+  eventClick(info){
+    alert("Booking: " + info.event.title);
+  },
+
+  eventDrop: async function(info){
+
+    const newDate = info.event.startStr.split("T")[0];
+    const newTime = info.event.startStr.split("T")[1];
+
+    await updateDoc(doc(db,"bookings",info.event.id),{
+      date: newDate,
+      time: newTime
+    });
+
   }
+
+});
+
+calendar.render();
+
 }
 
 async function confirmPitched(id, value, btn) {
@@ -1305,28 +1907,6 @@ async function updateBookingStatus(id, status) {
     alert("❌ Failed: " + err.message);
   }
 }
-  
-window.toggleSection = function(header) {
-
-  const content = header.nextElementSibling;
-
-  if (content.classList.contains("expanded")) {
-
-    content.style.maxHeight = content.scrollHeight + "px";
-
-    requestAnimationFrame(() => {
-      content.style.maxHeight = "0px";
-    });
-
-    content.classList.remove("expanded");
-
-  } else {
-
-    content.classList.add("expanded");
-    content.style.maxHeight = content.scrollHeight + "px";
-
-  }
-};
 
 async function deleteBooking(id) {
   if (!confirm("Delete this booking?")) return;
@@ -1386,13 +1966,48 @@ document.getElementById("clearAllBtn").onclick = async function () {
   }
 };
 
-document.getElementById("loadMoreBtn")
-  .addEventListener("click", () => {
-    loadPastBookings(false);
+const navButtons = document.querySelectorAll(".nav-btn");
+
+navButtons.forEach((btn, index) => {
+
+  btn.addEventListener("click", () => {
+
+    navButtons.forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    const dashboard = document.getElementById("dashboardHeader");
+    const calendar = document.getElementById("calendar");
+    const charts = document.querySelector(".charts-grid");
+
+    if(index === 0){ // Dashboard
+      dashboard.style.display = "block";
+      calendar.style.display = "none";
+      charts.style.display = "none";
+    }
+
+    if(index === 1){ // Calendar
+      dashboard.style.display = "none";
+      calendar.style.display = "block";
+      charts.style.display = "none";
+    }
+
+    if(index === 2){ // Bookings
+      dashboard.style.display = "block";
+      calendar.style.display = "none";
+      charts.style.display = "none";
+    }
+
+    if(index === 3){ // Analytics
+      dashboard.style.display = "none";
+      calendar.style.display = "none";
+      charts.style.display = "grid";
+    }
+
+  });
+
 });
 
 // 🔥 Expose functions to HTML (because we use type="module")
-window.toggleSection = toggleSection;
 window.showScreen = showScreen;
 window.closeAdminLogin = hideAdminModal;
 window.toggleAdminPassword = toggleAdminPassword;
