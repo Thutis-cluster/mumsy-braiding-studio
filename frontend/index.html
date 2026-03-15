@@ -352,6 +352,14 @@ input:focus, select:focus {
   padding-right: 35px;
 }
 
+.input-valid {
+  border:2px solid #2ecc71;
+}
+
+.input-invalid {
+  border:2px solid #e74c3c;
+}
+
 .checkmark {
   position: absolute;
   right: 10px;
@@ -911,11 +919,6 @@ input:focus, select:focus {
   <button class="button" onclick="showScreen('styles',2)">
     Book Appointment
   </button>
-
-  <!-- Admin button hidden by default -->
-  <button class="button" id="adminBtn" onclick="showScreen('adminLogin',1)">
-    💼 Owner Admin Panel
-  </button>
 </div>
   
 <div id="styles" class="screen">
@@ -947,7 +950,7 @@ input:focus, select:focus {
   
   <button class="button" onclick="showScreen('home',1)">Back</button>
 </div>
-  
+
 <div id="length" class="screen">
   <h2>Select Length</h2>
 
@@ -987,12 +990,12 @@ input:focus, select:focus {
 <input type="hidden" id="clientDate">
 <select id="clientTime" onchange="validateDateTimeStep()">
   <option value="">Select time</option>
-  <option>08:00</option>
-  <option>09:00</option>
-  <option>11:00</option>
-  <option>13:30</option>
-  <option>14:30</option>
-  <option>16:00</option>
+  <option value="08:00">08:00</option>
+  <option value="09:00">09:00</option>
+  <option value="11:00">11:00</option>
+  <option value="13:30">13:30</option>
+  <option value="14:30">14:30</option>
+  <option value="16:00">16:00</option>
 </select>
   <button class="button" onclick="showScreen('length',3)">Back</button>
 <button id="dateNextBtn" class="button" onclick="goToClientScreen()" disabled>
@@ -1002,6 +1005,8 @@ input:focus, select:focus {
 
 <div id="client" class="screen">
   <h2>Your Details</h2>
+<input type="hidden" id="formLoadedAt">
+<input type="text" id="website" style="display:none">
 <div class="input-group">
   <input id="clientName" placeholder="Please Enter Your Full Name *" required oninput="validateClientForm()">
   <span class="checkmark" id="nameCheck">✔</span>
@@ -1009,21 +1014,26 @@ input:focus, select:focus {
 <span class="error" id="nameError"></span>
 
 <div class="input-group">
-  <input type="tel" id="clientPhone" placeholder="Phone Numbers *" pattern="[0-9+\s]{9,15}" required oninput="validateClientForm()">
+<input 
+id="clientPhone"
+type="tel"
+maxlength="10"
+inputmode="numeric"
+pattern="\d{10}"
+placeholder="10 digit phone number"
+required oninput="validateClientForm()"
+>
   <span class="checkmark" id="phoneCheck">✔</span>
 </div>
 <span class="error" id="phoneError"></span>
 
-<input type="email" id="clientEmail" placeholder="Email (Optional)">
+<input type="email" id="clientEmail" placeholder="Email Address *" required>
+<span class="checkmark" id="emailCheck">✔</span>
+<span class="error" id="emailError"></span>
 
-
-  <button class="button" onclick="showScreen('date',4)">Back</button>
-<button class="button submit-btn" id="button submit-btn" onclick="goToReview('sms')">
-  ✅ Confirm Booking (SMS)
-</button>
-
-<button class="button submit-btn" id="button submit-btn" onclick="goToReview('whatsapp')">
-  📱 Send Booking on WhatsApp
+<button class="button" onclick="showScreen('date',4)">Back</button>
+<button class="button submit-btn" id="submitBtn" onclick="validateAndProceed('sms')">
+  ✅ Proceed Booking
 </button>
 <p id="formHint" class="form-hint"></p>
 
@@ -1059,9 +1069,8 @@ input:focus, select:focus {
   <p>Balance Due (Cash on Appointment Date): R<span id="cBalance"></span></p>
 </div>
   <p>Payment Status: <span id="cPaymentStatus"></span></p>
-  <p>Hair Prep: Wash & dry hair before appointment</p>
+  <p>Hair Prep: Please Wash & dry hair before appointment</p>
   <p>Cancellation: 24h notice required</p>
- <button id="backButton" class="button">Back</button>
 <button id="doneButton" class="button">Done</button>
 </div>
 
@@ -1079,51 +1088,20 @@ input:focus, select:focus {
   </div>
 </div>
 
-<audio id="successSound" src="success.mp3" preload="auto"></audio>
-
-  <!-- Admin Login Modal -->
-<div id="adminLoginModal" class="modal">
-  <div class="modal-content">
-    <span class="close" onclick="closeAdminLogin()">&times;</span>
-    <h2>🔐 Owner Login</h2>
-
-    <input type="email" id="adminEmail" placeholder="Admin Email">
-   <div class="password-wrapper">
-  <input type="password" id="adminPassword" placeholder="Password">
-  <span class="toggle-password" onclick="toggleAdminPassword()">👁️</span>
-  </div>
-
-<button class="button" id="adminLoginBtn" onclick="adminLogin()">
-  <span class="btn-text">Login</span>
-  <span class="btn-spinner"></span>
-</button>
-    <p class="forgot-password" onclick="forgotAdminPassword()">🔑 Forgot password?</p>
-     <p id="adminLoginError" class="error"></p>
-  </div>
-</div>
-  
-<div id="admin" class="screen">
-  <button class="button decline" onclick="adminLogout()">🚪 Logout</button>
-  <h2>💼 Owner Admin Panel</h2>
-  <div id="bookingsList">
-    <div id="dailySummary"></div>
-    <p>Loading bookings...</p>
-  </div>
-  <button id="clearAllBtn" class="button danger">Clear All Bookings</button>
-  <h3>🧾 Reminder Logs</h3>
-<div id="reminderLogs"></div>
-</div>
-
 <script type="module">
   // ----------------- FIREBASE -----------------
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, query, where, getDocs, orderBy, onSnapshot, doc, getDoc,  writeBatch} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, setPersistence, inMemoryPersistence,   browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
 
   console.log("🔥 Script Loaded Properly");
+
+  const field = document.getElementById("formLoadedAt");
+  if (field) {
+    field.value = Date.now();
+  }
 
   // ---------------- FIREBASE INIT ----------------
 const firebaseConfig = {
@@ -1138,17 +1116,9 @@ const firebaseConfig = {
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
-  const auth = getAuth(app);
-  window.auth = auth;
-
-await setPersistence(auth, browserSessionPersistence);
   const functions = getFunctions(app, "us-central1");
 
   const createBooking = httpsCallable(functions, "createBooking");
-  const updateBookingStatusFn = httpsCallable(functions, "updateBookingStatus");
-  const deleteBookingFn = httpsCallable(functions, "deleteBooking");
-  const markPitchedFn = httpsCallable(functions, "markPitched");
-
   console.log("🔥 Firebase Initialized Correctly");
 
 // ----------------- VARIABLES -----------------
@@ -1164,6 +1134,7 @@ let currentYear;
 let currentMonth; // 0–11
 const WORK_START = 8;  // 08:00
 const WORK_END = 17;  // 17:00
+const MAX_BOOKINGS_PER_SLOT = 5;
 const MAX_WORK_HOURS_PER_DAY = 8;
 const PUBLIC_HOLIDAYS = [
   "2026-01-01", // New Year's Day
@@ -1255,6 +1226,45 @@ document.querySelectorAll('.style-card, .calendar-day').forEach(el => {
 });
 
 
+// ----------------- BOTS CHECK -----------------
+let humanSignals = {
+  mouse: false,
+  keyboard: false,
+  scroll: false,
+  time: Date.now()
+};
+
+document.addEventListener("mousemove", () => {
+  humanSignals.mouse = true;
+}, { once: true });
+
+document.addEventListener("keydown", () => {
+  humanSignals.keyboard = true;
+}, { once: true });
+
+document.addEventListener("scroll", () => {
+  humanSignals.scroll = true;
+}, { once: true });
+
+function isLikelyHuman(){
+
+  const timeSpent = (Date.now() - humanSignals.time) / 1000;
+
+  if(timeSpent < 3) return false;
+
+  if(
+    !humanSignals.mouse &&
+    !humanSignals.keyboard &&
+    !humanSignals.scroll
+  ){
+    return false;
+  }
+
+  return true;
+}
+
+
+// ----------------- ESTIMATED TIME -----------------
 function getHourFromTime(timeStr) {
   // "13:00" → 13
   return parseInt(timeStr.split(":")[0], 10);
@@ -1267,7 +1277,7 @@ function getHourFromTime(timeStr) {
 }
 
 const prices = {
-  "Box Braids": { Short: 200, Medium: 300, Long: 500 },
+  "Box Braids": { Short: 200.00, Medium: 300.00, Long: 500.00 },
   "Knotless Braids": { Short: 180, Medium: 200, Long: 250 },
   
   // NEW
@@ -1321,8 +1331,9 @@ function selectStyle(style) {
   // ===== CORNROWS & BEN & BETTY =====
   if (style === "CornRows" || style === "Ben & Betty") {
     shortCard.querySelector("strong").textContent = "Simple";
-    document.getElementById("shortPrice").textContent = prices[style].Simple;
-    document.getElementById("shortTime").textContent = times[style].Simple;
+    document.getElementById("shortPrice").textContent = formatPrice(prices[style].Simple).replace("R","");
+
+document.getElementById("shortTime").textContent = times[style].Simple;
 
     mediumCard.style.display = "none";
     longCard.style.display = "none";
@@ -1333,11 +1344,11 @@ function selectStyle(style) {
     shortCard.querySelector("strong").textContent = "Small";
     mediumCard.querySelector("strong").textContent = "Medium";
     longCard.querySelector("strong").textContent = "Large";
+  document.getElementById("shortPrice").textContent = formatPrice(prices[style].Short).replace("R","");
 
-    document.getElementById("shortPrice").textContent = prices[style].Short;
-    document.getElementById("mediumPrice").textContent = prices[style].Medium;
-    document.getElementById("longPrice").textContent = prices[style].Long;
+document.getElementById("mediumPrice").textContent = formatPrice(prices[style].Medium).replace("R","");
 
+document.getElementById("longPrice").textContent = formatPrice(prices[style].Long).replace("R","");
     document.getElementById("shortTime").textContent = times[style].Short;
     document.getElementById("mediumTime").textContent = times[style].Medium;
     document.getElementById("longTime").textContent = times[style].Long;
@@ -1348,12 +1359,10 @@ function selectStyle(style) {
     shortCard.querySelector("strong").textContent = "Short";
     mediumCard.querySelector("strong").textContent = "Medium";
     longCard.querySelector("strong").textContent = "Long";
-
-    document.getElementById("shortPrice").textContent = prices[style].Short;
-    document.getElementById("mediumPrice").textContent = prices[style].Medium;
-    document.getElementById("longPrice").textContent = prices[style].Long;
-
-    document.getElementById("shortTime").textContent = times[style].Short;
+  document.getElementById("shortPrice").textContent = formatPrice(prices[style].Short).replace("R","");
+    document.getElementById("mediumPrice").textContent = formatPrice(prices[style].Medium).replace("R","");
+    document.getElementById("longPrice").textContent = formatPrice(prices[style].Long).replace("R","");
+   document.getElementById("shortTime").textContent = times[style].Short;
     document.getElementById("mediumTime").textContent = times[style].Medium;
     document.getElementById("longTime").textContent = times[style].Long;
   }
@@ -1377,37 +1386,37 @@ function selectLength(length) {
 }
 
 // ----------------- HANDLE CALENDER DATE SELECTION -----------------
-  function handleDateSelection() {
-  const dateInput = document.getElementById("clientDate");
-  const selectedDate = dateInput.value;
+async function handleDateSelection() {
+  try {
+    const dateInput = document.getElementById("clientDate");
+    const selectedDate = dateInput.value;
 
-  if (!selectedDate)  {
-    alert("Please select a date.");
-    return;
-  }
+    if (!selectedDate) {
+      alert("Please select a date.");
+      return;
+    }
 
-  // Fetch bookings for selected date
-  db.collection("bookings")
-    .where("date", "==", selectedDate)
-    .get()
-    .then(snapshot => {
-      let totalHours = 0;
+    const bookingsRef = collection(db, "bookings");
+    const q = query(bookingsRef, where("date", "==", selectedDate));
+    const snapshot = await getDocs(q);
 
-      snapshot.forEach(doc => {
-        const booking = doc.data();
-        const hours = estimateToHours(booking.timeEstimate || "0");
-        totalHours += hours;
-      });
+    let totalHours = 0;
 
-      if (totalHours >= MAX_WORK_HOURS_PER_DAY) {
-        alert("⛔ This day is fully booked. Please choose another date.");
-        dateInput.value = ""; // reset date
-        validateClientForm();
-      }
-    })
-    .catch(err => {
-      console.error("Date check failed:", err);
+    snapshot.forEach(doc => {
+      const booking = doc.data();
+      const hours = estimateToHours(booking.timeEstimate || "0");
+      totalHours += hours;
     });
+
+    if (totalHours >= MAX_WORK_HOURS_PER_DAY) {
+      alert("⛔ This day is fully booked. Please choose another date.");
+      document.getElementById("clientDate").value = "";
+      validateClientForm();
+    }
+
+  } catch (err) {
+    console.error("Date check failed:", err);
+  }
 }
 
 function changeMonth(direction) {
@@ -1544,9 +1553,14 @@ const holidays = getSouthAfricanHolidays(year);
 
   for (let day = 1; day <= daysInMonth; day++) {
     const dateStr = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-    const div = document.createElement("div");
-    div.className = "calendar-day";
-    div.textContent = day;
+const div = document.createElement("div");
+div.className = "calendar-day";
+div.textContent = day;
+
+// 🔥 Restore previously selected date highlight
+if (selectedDate === dateStr) {
+  div.classList.add("selected");
+}
 
     const dateObj = new Date(dateStr);
     const dayOfWeek = dateObj.getDay(); // 0 = Sunday
@@ -1594,6 +1608,7 @@ div.onclick = () => {
 
   div.classList.add("selected");
   selectedDate = dateStr;
+  updateAvailableTimeSlots(selectedDate);
 
   // 🔥 ADD THIS LINE
   const hiddenDateInput = document.getElementById("clientDate");
@@ -1648,7 +1663,6 @@ function showHolidayPopup(name) {
   }, 2500);
 }
 
-
 // ----------------- LOCK PAST TIMES -----------------
 function lockPastTimes() {
   const select = document.getElementById("clientTime");
@@ -1662,7 +1676,9 @@ function lockPastTimes() {
   Array.from(select.options).forEach(option => {
     if (!option.value) return;
 
-    option.disabled = false;
+if (option.dataset.full !== "true") {
+  option.disabled = false;
+}
 
     if (selectedDate === todayStr) {
       const optionHour = getHourFromTime(option.value);
@@ -1670,6 +1686,7 @@ function lockPastTimes() {
 
       if (optionHour <= currentHour) {
         option.disabled = true;
+  option.classList.add("past");
 
         if (option.selected) {
           currentSelectionStillValid = false;
@@ -1686,8 +1703,82 @@ function lockPastTimes() {
 validateDateTimeStep();
 }
 
-document.getElementById("clientTime").addEventListener("change", validateDateTimeStep);
+const timeSelect = document.getElementById("clientTime");
+if (timeSelect) {
+  timeSelect.addEventListener("change", validateDateTimeStep);
+}
 
+async function updateAvailableTimeSlots(date) {
+
+  const select = document.getElementById("clientTime");
+  if (!select || !date) return;
+
+  const dateObj = new Date(date);
+  const day = dateObj.getDay(); // 5 = Friday
+
+  // RESET ALL OPTIONS
+  Array.from(select.options).forEach(option => {
+    if (!option.value) return;
+
+    option.disabled = false;
+    option.dataset.full = "false";
+    option.classList.remove("past");
+    option.textContent = option.value.trim();
+  });
+
+  select.value = "";
+
+  try {
+
+    const q = query(
+      collection(db, "bookings"),
+      where("date", "==", date),
+      where("deleted", "==", false)
+    );
+
+    const snap = await getDocs(q);
+    const slotCounts = {};
+
+    snap.forEach(doc => {
+      const b = doc.data();
+      if (!b.time) return;
+
+      const time = b.time.trim();
+      slotCounts[time] = (slotCounts[time] || 0) + 1;
+    });
+
+    Array.from(select.options).forEach(option => {
+
+      if (!option.value) return;
+
+      const optionTime = option.value.trim();
+      const count = slotCounts[optionTime] || 0;
+
+      // 🔴 FRIDAY CLOSES AT 16:00
+      if (day === 5 && optionTime === "16:00") {
+        option.disabled = true;
+        option.textContent = "16:00 (Closed)";
+        return;
+      }
+
+      // 🔴 FULLY BOOKED
+      if (count >= MAX_BOOKINGS_PER_SLOT) {
+        option.disabled = true;
+        option.dataset.full = "true";
+        option.textContent = optionTime + " (Fully Booked)";
+        return;
+      }
+
+      // NORMAL SLOT
+      option.textContent = optionTime;
+
+    });
+
+  } catch (err) {
+    console.error("Slot availability check failed:", err);
+  }
+
+}
 
 // ----------------- NEXT BUTTON DISABLED -----------------
 function goToClientScreen() {
@@ -1727,93 +1818,270 @@ function validateDateTimeStep() {
   }
 }
 
+// ----------------- CHECK FAKE NUMBER -----------------
+function isFakePhone(number){
+
+  const fakePatterns = [
+    "0000000000",
+    "1111111111",
+    "2222222222",
+    "3333333333",
+    "4444444444",
+    "5555555555",
+    "6666666666",
+    "7777777777",
+    "8888888888",
+    "9999999999",
+    "1234567890",
+    "0123456789",
+    "0987654321"
+  ];
+
+  if (fakePatterns.includes(number)) return true;
+
+  // Detect repeated digits
+  if (/^(\d)\1+$/.test(number)) return true;
+
+  return false;
+}
+
+async function checkPhoneReal(phone){
+
+  try{
+
+    const res = await fetch("https://apilayer.net/api/validate?number=" + phone);
+
+    const data = await res.json();
+
+    return data.valid;
+
+  }catch{
+    return true;
+  }
+
+}
+
+// ----------------- EMAIL CHECK -----------------
+async function checkEmailDomain(email){
+
+  const domain = email.split("@")[1];
+
+  try{
+    const res = await fetch("https://dns.google/resolve?name=" + domain + "&type=MX");
+    const data = await res.json();
+
+    return data.Answer && data.Answer.length > 0;
+
+  }catch{
+    return false;
+  }
+
+}
+
+function isDisposableEmail(email){
+
+  const blocked = [
+    "mailinator.com",
+    "tempmail.com",
+    "10minutemail.com",
+    "guerrillamail.com"
+  ];
+
+  const domain = email.split("@")[1];
+
+  return blocked.includes(domain);
+}
+
 // ----------------- VALIDE CLIENT FORM -----------------
 function validateClientForm() {
-  const nextBtn = document.getElementById("dateNextBtn");
+
   const nameInput = document.getElementById("clientName");
-  const phoneInput = document.getElementById("clientPhone");
-  const dateInput = document.getElementById("clientDate");
-  const timeInput = document.getElementById("clientTime");
-  const hint = document.getElementById("formHint");
+const phoneInput = document.getElementById("clientPhone");
+  const emailInput = document.getElementById("clientEmail");
 
-phoneInput.addEventListener("input", () => {
-  // Allow only digits, +, and space
-  phoneInput.value = phoneInput.value.replace(/[^0-9+\s]/g, '');
-});
-
-  // Reset previous invalid styles
-  [nameInput, phoneInput, dateInput, timeInput].forEach(input => {
-    input.classList.remove("invalid-field", "pulse-glow");
+if (emailInput) {
+  emailInput.addEventListener("input", function(){
+    this.value = this.value.toLowerCase();
   });
+}
 
-  let message = "";
-  let firstInvalid = null;
+  const nameError = document.getElementById("nameError");
+  const phoneError = document.getElementById("phoneError");
+  const emailError = document.getElementById("emailError");
 
-  // Validation checks
-  if (!nameInput.value.trim()) {
-    message = "Please enter your full name.";
-    firstInvalid = nameInput;
-  } else if (!phoneInput.value.trim() || !/^[0-9+\s]{9,15}$/.test(phoneInput.value.trim())) {
-    message = "Please enter a valid phone number.";
-    firstInvalid = phoneInput;
-  } else if (!dateInput.value) {
-    message = "Please select a booking date.";
-    firstInvalid = dateInput;
-  } else if (!timeInput.value) {
-    message = "Please select a time slot.";
-    firstInvalid = timeInput;
-  }
+  let valid = true;
 
-  // Apply red glow + pulse + scroll to first invalid
-  if (firstInvalid) {
-    firstInvalid.classList.add("invalid-field", "pulse-glow");
+  const name = nameInput.value.trim();
+  const phone = phoneInput.value.trim();
+  const email = emailInput.value.trim();
+const trap = document.getElementById("website").value;
 
-    // Smooth scroll
-    firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
+if (trap !== "") {
+  return false;
+}
 
-    // Auto-remove glow after 2.5 seconds
-    setTimeout(() => {
-      firstInvalid.classList.remove("pulse-glow");
-    }, 2500);
-  }
+  // Reset
+  nameError.textContent = "";
+  phoneError.textContent = "";
+  emailError.textContent = "";
 
-  // Update hint message
-hint.textContent = message;
-hint.style.opacity = "0"; // hide by default
+// NAME
+if (!name) {
+  nameError.textContent = "Please enter your name.";
+  valid = false;
+}
+else if (!/^[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,40}$/.test(name)) {
+  nameError.textContent = "Name can only contain letters.";
+  valid = false;
+}
 
-  // Enable or disable submit button
-  const isValid = !message;
- document.querySelectorAll(".submit-btn").forEach(btn => {
-  btn.dataset.valid = isValid ? "true" : "false";
-});
+// PHONE
+if (!phone) {
+  phoneError.textContent = "Please enter your phone number.";
+  valid = false;
+}
+else if (!/^(06|07|08)\d{8}$/.test(phone)) {
+  phoneError.textContent = "Phone number must be exactly 10 digits.";
+  valid = false;
+}
+else if (isFakePhone(phone)) {
+  phoneError.textContent = "Please enter a real phone number.";
+  valid = false;
+}
+
+// EMAIL (REQUIRED)
+if (!email) {
+  emailError.textContent = "Please enter your email address.";
+  valid = false;
+}
+else if (!/^[a-zA-Z0-9._%+-]+@(gmail|yahoo|outlook|hotmail|icloud|live)\.(com|co\.za|net|org)$/i.test(email)) {
+  emailError.textContent = "Please enter a valid email (gmail, outlook, yahoo, etc).";
+  valid = false;
+}
+else if (isDisposableEmail(email)) {
+  emailError.textContent = "Temporary email addresses are not allowed.";
+  valid = false;
+}
+
+  return valid;
 }
 
 document.querySelectorAll(".submit-btn").forEach(btn => {
+
   btn.addEventListener("click", (e) => {
 
-    const isValid = btn.dataset.valid === "true";
+    const formValid = validateClientForm();
 
-    if (!isValid) {
-      e.preventDefault();
+if (!formValid) {
+  e.preventDefault();
 
-      const hint = document.getElementById("formHint");
-      if (!hint) return;
+  const hint = document.getElementById("formHint");
+  hint.textContent = "⚠ Please fix the highlighted fields.";
+  hint.style.opacity = "1";
 
-      hint.textContent = "⚠ Please complete all required fields.";
-      hint.style.opacity = "1";
+  // Highlight first invalid field
+  const firstInvalid = document.querySelector(".input-invalid") || document.querySelector(".invalid-field");
+  if (firstInvalid) {
+    firstInvalid.classList.add("pulse-glow");
+    firstInvalid.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => firstInvalid.classList.remove("pulse-glow"), 2500);
+  }
 
-      setTimeout(() => {
-        hint.style.opacity = "0";
-      }, 3000);
+  setTimeout(()=> {
+    hint.style.opacity="0";
+  },3000);
 
-      validateClientForm(); // triggers red glow on invalid fields
-      return;
+  return;
+}
+
+    goToReview(btn.dataset.method || "default");
+
+  });
+
+});
+
+const phoneInput = document.getElementById("clientPhone");
+
+if (phoneInput) {
+  phoneInput.addEventListener("input", function(){
+    this.value = this.value.replace(/\D/g,"").slice(0,10);
+  });
+}
+
+function liveValidate(input, checkEl, validator){
+
+  input.addEventListener("input", () => {
+
+    const valid = validator(input.value);
+
+    if(valid){
+      input.classList.remove("input-invalid");
+      input.classList.add("input-valid");
+      checkEl.style.display = "inline";
+    } else {
+      input.classList.remove("input-valid");
+      input.classList.add("input-invalid");
+      checkEl.style.display = "none";
     }
 
-    // If valid → continue normally
-    goToReview(btn.dataset.method || "default");
   });
-});
+
+}
+
+liveValidate(
+  document.getElementById("clientName"),
+  document.getElementById("nameCheck"),
+  value => /^[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,40}$/.test(value)
+);
+
+liveValidate(
+  document.getElementById("clientPhone"),
+  document.getElementById("phoneCheck"),
+  value => /^(06|07|08)\d{8}$/.test(value)
+);
+
+liveValidate(
+  document.getElementById("clientEmail"),
+  document.getElementById("emailCheck"),
+value => /^[a-zA-Z0-9._%+-]+@(gmail|yahoo|outlook|hotmail|icloud|live)\.(com|co\.za|net|org)$/i.test(value)
+);
+
+function validateAndProceed(method){
+
+  const loaded = Number(document.getElementById("formLoadedAt")?.value);
+
+  if (loaded && Date.now() - loaded < 2000) {
+    console.warn("Bot blocked: form submitted too fast");
+    return;
+  }
+
+if(!isLikelyHuman()){
+  console.warn("Bot activity blocked");
+  return;
+}
+
+  validateClientForm();
+
+  const nameValid = document.getElementById("nameCheck").style.display === "inline";
+  const phoneValid = document.getElementById("phoneCheck").style.display === "inline";
+const emailInput = document.getElementById("clientEmail").value.trim();
+const emailValid = document.getElementById("emailCheck").style.display === "inline";
+
+if(!nameValid || !phoneValid || !emailValid){
+    
+    const hint = document.getElementById("formHint");
+    hint.textContent = "⚠ Please complete all required fields.";
+    hint.style.opacity = "1";
+
+    setTimeout(()=>{
+      hint.style.opacity="0";
+    },3000);
+
+    return;
+  }
+
+  goToReview(method);
+}
 
 // ----------------- REVIEW -----------------
 function goToReview(method) {
@@ -1828,7 +2096,7 @@ function goToReview(method) {
   const clientEmail = document.getElementById("clientEmail").value.trim();
   const selectedTime = document.getElementById("clientTime").value;
 
-  if (!clientName || !clientPhone || !selectedTime) {
+if (!clientName || !clientPhone || !clientEmail || !selectedTime) {
     alert("Please complete all required fields.");
     return;
   }
@@ -1861,31 +2129,66 @@ if (selectedDate === todayStr) {
   showScreen("review", 6);
 }
 
+function formatBookingDate(dateStr){
+
+  const d = new Date(dateStr);
+
+  const options = {
+    weekday: "long",
+    day: "numeric",
+    month: "long"
+  };
+
+  return d.toLocaleDateString("en-GB", options);
+}
+
+function formatBookingTime(timeStr){
+
+  const [hour, minute] = timeStr.split(":");
+
+  const d = new Date();
+  d.setHours(hour);
+  d.setMinutes(minute);
+
+  return d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  });
+}
+
+const formatPrice = price => new Intl.NumberFormat("en-ZA",{style:"currency",currency:"ZAR"}).format(price);
+
 // ----------------- RENDER REVIEW -----------------
+
 function renderReview() {
+
   const el = document.getElementById("reviewDetails");
   if (!el) return;
 
-  const price = pendingBooking.price;
+  const price = Number(pendingBooking.price).toFixed(2);
   const DEPOSIT_THRESHOLD = 100;
 
   let depositHTML = "";
   let balanceHTML = "";
 
-  if (price >= DEPOSIT_THRESHOLD) {
-    const deposit = Math.round(price * 0.45);
-    const balance = price - deposit;
+  if (pendingBooking.price >= DEPOSIT_THRESHOLD) {
+
+    const deposit = (pendingBooking.price * 0.45).toFixed(2);
+    const balance = (pendingBooking.price - pendingBooking.price * 0.45).toFixed(2);
 
     depositHTML = `
       <p style="color:#27AE60;">
-        <strong>Deposit Required (45%):</strong> R${deposit}
+<strong>Deposit Required (45%):</strong> ${formatPrice(deposit)}
       </p>
     `;
 
     balanceHTML = `
-      <p><strong>Balance Due at Appointment:</strong> R${balance}</p>
+      <p><strong>Balance Due at Appointment:</strong> ${formatPrice(balance)}</p>
     `;
+
   } else {
+
     depositHTML = `
       <p style="color:#27AE60;">
         <strong>Deposit:</strong> Not Required
@@ -1894,25 +2197,29 @@ function renderReview() {
   }
 
   el.innerHTML = `
+
+    <p><strong>Name:</strong> ${pendingBooking.clientName}</p>
+    <p><strong>Phone:</strong> ${pendingBooking.clientPhone}</p>
+    <p><strong>Email:</strong> ${pendingBooking.clientEmail || "N/A"}</p>
+
+    <hr>
+
     <p><strong>Style:</strong> ${pendingBooking.style}</p>
     <p><strong>Length:</strong> ${pendingBooking.length}</p>
 
     <hr>
 
-    <p><strong>Total Price:</strong> R${price}</p>
+<p><strong>Date:</strong> ${formatBookingDate(pendingBooking.date)}</p>    <p><strong>Time:</strong> ${formatBookingTime(pendingBooking.time)}</p>
+
+    <hr>
+
+<p style="font-size:20px;font-weight:600;">
+<strong>Total Price:</strong> ${formatPrice(pendingBooking.price)}
+</p>
+
     ${depositHTML}
     ${balanceHTML}
 
-    <hr>
-
-    <p><strong>Date:</strong> ${pendingBooking.date}</p>
-    <p><strong>Time:</strong> ${pendingBooking.time}</p>
-
-    <hr>
-
-    <p><strong>Name:</strong> ${pendingBooking.clientName}</p>
-    <p><strong>Phone:</strong> ${pendingBooking.clientPhone}</p>
-    <p><strong>Email:</strong> ${pendingBooking.clientEmail || "N/A"}</p>
   `;
 }
 
@@ -2021,9 +2328,9 @@ async function loadConfirmation(idOrReference) {
     document.getElementById("cEmail").textContent = booking.clientEmail || "N/A";
     document.getElementById("cStyle").textContent = booking.style;
     document.getElementById("cLength").textContent = booking.length;
-    document.getElementById("cDate").textContent = booking.date;
-    document.getElementById("cTime").textContent = booking.time;
-    document.getElementById("cPrice").textContent = booking.price;
+    document.getElementById("cDate").textContent = formatBookingDate(booking.date);
+    document.getElementById("cTime").textContent = formatBookingTime(booking.time);
+    document.getElementById("cPrice").textContent = formatPrice(booking.price).replace("R","");
     document.getElementById("cStatus").textContent = booking.status;
     document.getElementById("cPaymentStatus").textContent = booking.paymentStatus;
 
@@ -2031,8 +2338,9 @@ async function loadConfirmation(idOrReference) {
     const depositSection = document.getElementById("depositSection");
     if (booking.price >= 100) {
       depositSection.style.display = "block";
-      document.getElementById("cDeposit").textContent = Math.round(booking.price * 0.45);
-      document.getElementById("cBalance").textContent = booking.price - Math.round(booking.price * 0.45);
+      document.getElementById("cDeposit").textContent = formatPrice(booking.price * 0.45).replace("R","");
+
+document.getElementById("cBalance").textContent = formatPrice(booking.price - (booking.price * 0.45)).replace("R","");
     } else {
       depositSection.style.display = "none";
     }
@@ -2185,6 +2493,7 @@ function fullResetBookingFlow() {
   errors.forEach(e => e.textContent = "");
 
   // 5️⃣ Reset calendar selection
+  selectedDate = ""; // clear the selected date
   document.querySelectorAll("#calendar .selected").forEach(day => {
     day.classList.remove("selected");
   });
@@ -2198,6 +2507,9 @@ function fullResetBookingFlow() {
 
 sessionStorage.removeItem("lastBookingReference");
 window.history.replaceState({}, document.title, window.location.pathname);
+
+ // 8️⃣ Re-render calendar to refresh visuals
+  renderCalendar(currentYear, currentMonth);
 }
 
 // ----------------- ESTIMATED MINUTES -----------------
@@ -2220,385 +2532,19 @@ const TIME_PER_SLOT_MINUTES = 90; // 1.5 hours
   });
 }
 
-// ------------------ Show modal when admin button is clicked ------------------
-document.getElementById("adminBtn").addEventListener("click", () => {
-  showAdminModal();
-});
-
-// ------------------ Show modal function ------------------
-function showAdminModal() {
-  const modal = document.getElementById("adminLoginModal");
-  modal.classList.add("show");
-
-  // Clicking outside closes the modal
-  modal.addEventListener("click", function onOutsideClick(e) {
-    if (e.target === modal) {
-      hideAdminModal();
-      modal.removeEventListener("click", onOutsideClick);
-    }
-  });
-}
-
-// ------------------ Hide modal function ------------------
-function hideAdminModal() {
-  const modal = document.getElementById("adminLoginModal");
-  modal.classList.remove("show");
-
-  // Clear fields
-  document.getElementById("adminEmail").value = "";
-  document.getElementById("adminPassword").value = "";
-  document.getElementById("adminLoginError").textContent = "";
-
-  // Make sure home screen is visible
-  showScreen("home", 1);
-}
-
-// ------------------ PRESS ENTER AFTER PASSWORD ------------------
-document.getElementById("adminPassword").addEventListener("keypress", function (e) {
-  if (e.key === "Enter") {
-    adminLogin();
-  }
-});
-
-document.getElementById("adminEmail").addEventListener("keypress", function (e) {
-  if (e.key === "Enter") {
-    adminLogin();
-  }
-});
-
-// ------------------ Hide modal after successful login ------------------
-function onAdminLoginSuccess() {
-  hideAdminModal();  // hide modal
-  showScreen("admin", 5); 
-  openAdmin();       // open admin panel
-}
-
-async function adminLogin() {
-  const email = document.getElementById("adminEmail").value;
-  const password = document.getElementById("adminPassword").value;
-  const errorEl = document.getElementById("adminLoginError");
-  const loginBtn = document.getElementById("adminLoginBtn");
-  const modalContent = document.querySelector("#adminLoginModal .modal-content");
-
-  errorEl.textContent = "";
-
-  // Start loading state
-  loginBtn.classList.add("loading");
-  loginBtn.disabled = true;
-
-  try {
-    // 1️⃣ Sign in
-    await signInWithEmailAndPassword(auth, email, password);
-
-    // 2️⃣ Verify admin via backend
-    const verifyFn = httpsCallable(functions, "verifyAdmin");
-    await verifyFn();
-
-    // 3️⃣ Mark this as a fresh login
-    sessionStorage.setItem("adminJustLoggedIn", "true");
-
-    hideAdminModal();
-    openAdmin();
-
-  } catch (err) {
-
-    // Shake animation
-    modalContent.classList.add("shake");
-    setTimeout(() => {
-      modalContent.classList.remove("shake");
-    }, 400);
-
-    console.error("LOGIN ERROR:", err);
-    errorEl.textContent = "❌ Login failed: " + err.message;
-
-    // Clear password
-    document.getElementById("adminPassword").value = "";
-
-    // Safety logout
-    await signOut(auth);
-  } finally {
-    // ALWAYS reset button state
-    loginBtn.classList.remove("loading");
-    loginBtn.disabled = false;
-  }
-}
-
-// Forgot Password function
-async function forgotAdminPassword() {
-  const email = document.getElementById("adminEmail").value.trim();
-  const errorEl = document.getElementById("adminLoginError");
-  errorEl.textContent = "";
-
-  if (!email) {
-    errorEl.textContent = "❌ Please enter your admin email.";
-    return;
-  }
-
-  try {
-    const forgotFn = httpsCallable(functions, "forgotAdminPassword");
-    const result = await forgotFn({ email });
-
-    alert(result.data.message); // e.g., "If this email is registered as an admin, a reset email has been sent."
-  } catch (err) {
-    console.error("Forgot password error:", err);
-    errorEl.textContent = "❌ " + (err.message || "Failed to send reset email");
-  }
-}
-
-// Keep only one onAuthStateChanged listener
-auth.onAuthStateChanged(async (user) => {
-  const lastBooking = sessionStorage.getItem("lastBookingReference");
-
-  // 🔐 If admin is logged in → ALWAYS go to admin only
-  if (user) {
-    try {
-      const verifyFn = httpsCallable(functions, "verifyAdmin");
-      await verifyFn();
-
-      openAdmin();
-      return; // STOP here. Never load confirmation.
-    } catch (err) {
-      await signOut(auth);
-      showScreen("home", 1);
-      return;
-    }
-  }
-
- // 👤 Normal user
-showScreen("home", 1);
-
-// Clean URL if someone manually pasted confirmation link
-const params = new URLSearchParams(window.location.search);
-if (params.has("bookingId") || params.has("reference")) {
-  window.history.replaceState({}, document.title, window.location.pathname);
-}
-});     
-
- function toggleAdminPassword() {
-  const passwordInput = document.getElementById("adminPassword");
-  const icon = document.querySelector(".toggle-password");
-
-  if (passwordInput.type === "password") {
-    passwordInput.type = "text";
-    icon.textContent = "🙈";
-  } else {
-    passwordInput.type = "password";
-    icon.textContent = "👁️";
-  }
-}
-
-function adminLogout() {
- sessionStorage.removeItem("lastBookingReference"); // ✅ clear it
-
-  auth.signOut().then(() => {
-
-    // Clear login fields
-    document.getElementById("adminEmail").value = "";
-    document.getElementById("adminPassword").value = "";
-    document.getElementById("adminLoginError").textContent = "";
-
-    showScreen("home", 1);
-  });
-}
-
-// ----------------- ADMIN PANEL -----------------
-async function openAdmin() {
-  if (!auth.currentUser) {
-    showScreen("home", 1);
-    return;
-  }
-
-  showScreen("admin", 5);
-  const list = document.getElementById("bookingsList");
-  const summary = document.getElementById("dailySummary");
-
-  // Listening for changes to the "bookings" collection
-  const bookingsRef = collection(db, "bookings");
-  const q = query(bookingsRef, orderBy("createdAt", "desc"));
-
-  onSnapshot(q, snapshot => {
-    list.innerHTML = ""; // Clear the current list
-    summary.innerHTML = ""; // Clear the summary
-
-    const dailyTotals = {};
-    const dailyRevenue = {};
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today to midnight
-
-    snapshot.docs.forEach(doc => {
-      const booking = doc.data();
-      const id = doc.id;
-      const dateStr = booking.date || "Unknown";
-      const bookingDate = booking.date ? new Date(booking.date) : today;
-      bookingDate.setHours(0, 0, 0, 0); // Normalize the date
-
-      const hours = estimateToHours(booking.timeEstimate || "0");
-      dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + hours;
-
-      // Calculate revenue only for pitched bookings
-      if (booking.pitched === "yes") {
-        dailyRevenue[dateStr] = (dailyRevenue[dateStr] || 0) + (booking.price || 0);
-      } else {
-        dailyRevenue[dateStr] = dailyRevenue[dateStr] || 0;
-      }
-
-      // Determine booking status class
-      const statusClass = 
-        booking.status === "Pending" ? "pending" :
-        booking.status === "Accepted" ? "accepted" :
-        booking.status === "Declined" ? "declined" : "pending";
-
-      // Render booking card with pitch options
-      let pitchHTML = "";
-      if (bookingDate <= today) {
-        if (!booking.pitched || booking.pitched === "pending") {
-          pitchHTML = `
-            <div class="pitch-buttons">
-              <button class="button pitch" onclick="markPitched('${id}', 'yes')">Pitched</button>
-              <button class="button nopitch" onclick="markPitched('${id}', 'no')">Didn't Pitch</button>
-            </div>
-          `;
-        } else {
-          pitchHTML = `<p>Pitched: ${booking.pitched}</p>`;
-        }
-      } else {
-        pitchHTML = `<p>Pitched: Pending</p>`;
-      }
-
-      // Create the booking card
-      const card = document.createElement("div");
-      card.className = `booking-card ${statusClass}`;
-      card.innerHTML = `
-        <p><strong>${booking.clientName || "Unknown Client"}</strong></p>
-        <p>${booking.style || "Unknown Style"} – ${booking.length || "Unknown Length"}</p>
-        <p>⏱ ${booking.timeEstimate || "0 hrs"}</p>
-        <p>${dateStr} @ ${booking.time || "Unknown Time"}</p>
-        <p>Status: ${booking.status || "Pending"}</p>
-        <div class="booking-buttons">
-          <div class="status-buttons">
-            <button class="button accept" onclick="updateBookingStatus('${id}','Accepted')">Accept</button>
-            <button class="button decline" onclick="updateBookingStatus('${id}','Declined')">Decline</button>
-          </div>
-          ${pitchHTML}
-          <div class="delete-button">
-            <button class="button delete" onclick="deleteBooking('${id}')">Delete</button>
-          </div>
-        </div>
-      `;
-      list.appendChild(card);
-    });
-
-    // Render daily summary
-    for (const date in dailyTotals) {
-      const div = document.createElement("div");
-      div.className = "style-card";
-      div.innerHTML = `
-        <strong>${date}</strong><br>
-        ⏱ Work: ${dailyTotals[date]} hrs<br>
-        💰 Revenue: R${dailyRevenue[date]}<br>
-        <button class="button clear" onclick="clearBookingsForDate('${date}')">Clear</button>
-      `;
-      summary.appendChild(div);
-    }
-  });
-}
-  
-async function markPitched(id, value) {
-  try {
-    const fn = httpsCallable(functions, "markPitched");
-    await fn({ bookingId: id, value });
-  } catch (err) {
-    console.error(err);
-  }
-}
-
-async function updateBookingStatus(id, status) {
-  try {
-    const fn = httpsCallable(functions, "updateBookingStatus");
-    await fn({ bookingId: id, status });
-    alert("✅ Status updated");
-  } catch (err) {
-    alert("❌ Failed: " + err.message);
-  }
-}
-  
-async function deleteBooking(id) {
-  if (!confirm("Delete this booking?")) return;
-
-  try {
-    const fn = httpsCallable(functions, "deleteBooking");
-    await fn({ bookingId: id });
-    alert("✅ Booking deleted");
-  } catch (err) {
-    alert("❌ Failed: " + err.message);
-  }
-}
-
-function clearBookingsForDate(date) {
-  if (!confirm(`Are you sure you want to clear all bookings for ${date}?`)) return;
-
-  const bookingsRef = collection(db, "bookings");
-  const q = query(bookingsRef, where("date", "==", date));
-
-  getDocs(q)
-    .then(snapshot => {
-      const batch = writeBatch(db);
-      snapshot.forEach(doc => {
-        batch.delete(doc.ref); // Delete each document in the snapshot
-      });
-
-      return batch.commit(); // Commit the batch operation
-    })
-    .then(() => {
-      alert(`✅ All bookings for ${date} have been cleared`);
-    })
-    .catch(err => {
-      console.error("Error clearing bookings:", err);
-      alert("❌ Failed to clear bookings");
-    });
-}
-
-  function resetSubmitButtons() {
-  isSubmitting = false;
-  document.querySelectorAll(".submit-btn").forEach(btn => {
-    btn.disabled = false;
-    btn.textContent = btn.textContent.includes("SMS")
-      ? "✅ Confirm Booking (SMS)"
-      : "📱 Send Booking on WhatsApp";
-  });
-}
-
-document.getElementById("clearAllBtn").onclick = async function () {
-  if (!confirm("Delete ALL bookings?")) return;
-
-  try {
-    const fn = httpsCallable(functions, "clearAllBookings");
-    await fn();
-    alert("✅ All bookings cleared");
-  } catch (err) {
-    alert("❌ Failed: " + err.message);
-  }
-};
-
 // 🔥 Expose functions to HTML (because we use type="module")
 window.showScreen = showScreen;
 window.selectStyle = selectStyle;
 window.selectLength = selectLength;
 window.changeMonth = changeMonth;
+window.validateAndProceed = validateAndProceed;
 window.goToClientScreen = goToClientScreen;
+window.validateDateTimeStep = validateDateTimeStep;
 window.validateClientForm = validateClientForm;
 window.goToReview = goToReview;
 window.confirmBooking = confirmBooking;
-window.closeAdminLogin = hideAdminModal;
-window.toggleAdminPassword = toggleAdminPassword;
-window.adminLogin = adminLogin;
-window.forgotAdminPassword = forgotAdminPassword;
-window.adminLogout = adminLogout;
-window.markPitched = markPitched;
-window.updateBookingStatus = updateBookingStatus;
-window.deleteBooking = deleteBooking;
-window.clearBookingsForDate = clearBookingsForDate;
 
+showScreen("home", 1);
 });
           
 </script>
